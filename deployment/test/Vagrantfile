@@ -1,0 +1,17 @@
+ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
+
+Vagrant.configure("2") do |config|
+  config.vm.define :test_vm do |test_vm|
+    test_vm.vm.box = "fedora/24-cloud-base"
+  end
+
+  config.vm.provision "file", source: "/home/meatwad/prog/src/spam/src", destination: "~/spam"
+  config.vm.provision "shell", inline: "sudo bash /vagrant/bootstrap.sh"
+
+  config.vm.provider :libvirt do |libvirt|
+    libvirt.channel :type => 'unix', :target_name => 'org.qemu.guest_agent.0', :target_type => 'virtio'
+    libvirt.memory = 8192
+    libvirt.cpus = 2
+    libvirt.storage :file, :size => '50G', :allow_existing => true, :path => "guest_data.img"
+  end
+end
