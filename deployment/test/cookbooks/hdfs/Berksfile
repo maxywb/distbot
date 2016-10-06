@@ -1,0 +1,6 @@
+source 'https://supermarket.chef.io'
+cookbook 'hadoop', '~> 2.6.0'
+
+
+metadata
+

@@ -5,8 +5,12 @@ Vagrant.configure("2") do |config|
     test_vm.vm.box = "fedora/24-cloud-base"
   end
 
-  config.vm.provision "file", source: "/home/meatwad/prog/src/spam/src", destination: "~/spam"
+  config.vm.provision "file", source: "/home/meatwad/prog/src/hdfs-playground/src", destination: "~/spam"
   config.vm.provision "shell", inline: "sudo bash /vagrant/bootstrap.sh"
+
+  config.vm.provision "chef_solo" do |chef|
+    chef.add_recipe "hdfs"
+  end
 
   config.vm.provider :libvirt do |libvirt|
     libvirt.channel :type => 'unix', :target_name => 'org.qemu.guest_agent.0', :target_type => 'virtio'
