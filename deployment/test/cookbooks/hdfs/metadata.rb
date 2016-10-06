@@ -14,3 +14,4 @@ version '0.1.0'
 # gets a `View Source` link
 # source_url 'https://github.com/<insert_org_here>/hdfs' if respond_to?(:source_url)
 
+depends 'hadoop', '~> 2.6.0'

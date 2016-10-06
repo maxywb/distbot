@@ -1,6 +1,9 @@
 ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
 
 Vagrant.configure("2") do |config|
+
+
+
   config.vm.define :test_vm do |test_vm|
     test_vm.vm.box = "fedora/24-cloud-base"
   end
@@ -9,7 +12,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: "sudo bash /vagrant/bootstrap.sh"
 
   config.vm.provision "chef_solo" do |chef|
-    chef.add_recipe "hdfs"
+    chef.add_recipe "hdfs::init_namenode"
   end
 
   config.vm.provider :libvirt do |libvirt|
