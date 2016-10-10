@@ -1,8 +1,8 @@
-dnf install -y postgresql-server.x86_64
 
 mkdir /spam
 mount /dev/vdb1 /spam
-
+mkdir -p /spam/hdfs/data
+mkdir -p /spam/hdfs/name
 useradd spam
 echo "spam" | passwd --stdin spam
 mv /home/vagrant/spam/ /home/spam

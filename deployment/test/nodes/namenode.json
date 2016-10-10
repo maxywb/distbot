@@ -1,0 +1,11 @@
+{
+    "name":"namenode",
+    "hadoop" : {
+	"core_site" : {
+	    "dfs.namenode.data.dir" : "/spam/hdfs/data",
+	    "dfs.namenode.name.dir" : "/spam/hdfs/data",
+	    "dfs.data.data.dir" : "/spam/hdfs/data",
+	    "dfs.data.name.dir" : "/spam/hdfs/data"
+	}
+    }
+}
