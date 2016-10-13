@@ -1,0 +1,5 @@
+source 'https://supermarket.chef.io'
+
+include 'hadoop', '~> 2.6.0'
+metadata
+

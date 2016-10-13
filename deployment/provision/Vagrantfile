@@ -1,0 +1,31 @@
+ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
+
+Vagrant.configure("2") do |config|
+
+  #config.berkshelf.enabled = true
+
+  config.vm.define :test_vm do |test_vm|
+    test_vm.vm.box = "centos/6"
+  end
+
+  config.vm.provision "file", source: "/home/meatwad/prog/src/hdfs-playground/src", destination: "~/spam"
+  config.vm.provision "shell", inline: "sudo bash /vagrant/bootstrap.sh"
+
+  config.vm.provision "chef_solo" do |chef|
+    chef.cookbooks_path = ["cookbooks", "~/.chef/cookbooks"]
+    chef.nodes_path = "nodes"
+    chef.node_name = "namenode"
+    chef.add_recipe "hadoop_wrapper::hadoop_hdfs_namenode_init"
+
+    #chef.add_recipe "hadoop::hadoop_hdfs_datanode"
+
+
+  end
+
+  config.vm.provider :libvirt do |libvirt|
+    libvirt.channel :type => 'unix', :target_name => 'org.qemu.guest_agent.0', :target_type => 'virtio'
+    libvirt.memory = 8192
+    libvirt.cpus = 2
+    libvirt.storage :file, :size => '50G', :allow_existing => true, :path => "guest_data.img"
+  end
+end
