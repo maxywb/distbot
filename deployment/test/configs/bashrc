@@ -34,4 +34,8 @@ export PATH=$PATH:$ZOOKEEPER_HOME/bin
 export HBASE_HOME=/opt/hbase
 export PATH=$PATH:$HBASE_HOME/bin
 
+## KAFKA variables
+export KAFKA_HOME=/opt/hbase
+export PATH=$PATH:$KAFKA_HOME/bin
 
+export KAFKA_HEAP_OPTS="-Xmx256M -Xms128M"

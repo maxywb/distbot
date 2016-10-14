@@ -1,5 +1,15 @@
 set -e 
 
+pushd () {
+    # silence pushd
+    command pushd "$@" > /dev/null
+}
+
+popd () {
+    # silence popd
+    command popd "$@" > /dev/null
+}
+
 add_user() {
     username=$1
     home=/opt/${username}
@@ -24,6 +34,11 @@ add_user() {
     su - ${username} -c "ssh-keyscan -H 0.0.0.0 >> ${home}/.ssh/known_hosts"
     su - ${username} -c "ssh-keyscan -H $(hostname) >> ${home}/.ssh/known_hosts"
 
+    # save bash history
+    touch /spam/.bash_history-${username}
+    ln -s /spam/.bash_history-${username} ${home}/.bash_history
+    chown -R ${username}:${username} /spam/.bash_history-${username}
+
     usermod --append --groups supergroup ${username}
 }
 
@@ -32,16 +47,23 @@ install_package() {
     destination=$2
     url=$3
     
+    pushd /tmp
     echo "$(date) installing ${source}"
 
-    curl  --silent -o ${source}.tar.gz ${url}
+    curl --silent -o ${source}.tar.gz ${url}
 
-    tar zxf ${source}.tar.gz
-
+    mkdir ${source}
     mkdir -p ${destination}
+
+    tar zxf ${source}.tar.gz -C ${source} --strip-components 1
     
     cp -r ${source}/* ${destination}
+
+    popd
 }
+
+# set timezone so logs are understandable
+timedatectl set-timezone America/New_York
 
 # make supergroup
 groupadd supergroup
@@ -49,16 +71,18 @@ groupadd supergroup
 # make users
 add_user "hadoop"
 add_user "hbase"
-add_user "spam"
 add_user "spark"
 add_user "zookeeper"
+add_user "kafka"
 
-# install packages
+## install packages
+
+# install java - special case
+echo "$(date) installing java"
 pushd /tmp
-
-# install java 
 curl --silent -O -j -k -L -H "Cookie: oraclelicense=accept-securebackup-cookie" http://download.oracle.com/otn-pub/java/jdk/8u102-b14/jdk-8u102-linux-x64.rpm 
-rpm -U jdk-8u102-linux-x64.rpm
+rpm --upgrade jdk-8u102-linux-x64.rpm > /dev/null
+popd
 
 # install scala
 install_package scala-2.11.8 /opt/scala http://downloads.lightbend.com/scala/2.11.8/scala-2.11.8.tgz
@@ -76,7 +100,7 @@ echo "export JAVA_HOME=/usr/java/default" >> /opt/hadoop/etc/hadoop/hadoop-env.s
 chown -R hadoop:supergroup /opt/hadoop
 
 # install spark
-install_package spark-2.0.1-bin-hadoop2.7 /opt/spark http://d3kbcqa49mib13.cloudfront.net/spark-2.0.1-bin-hadoop2.7.tgz
+install_package spark-2.0.1 /opt/spark http://d3kbcqa49mib13.cloudfront.net/spark-2.0.1-bin-hadoop2.7.tgz
 
 chown -R spark:supergroup /opt/spark
 
@@ -94,10 +118,22 @@ install_package zookeeper-3.4.9 /opt/zookeeper http://www.gtlib.gatech.edu/pub/a
 
 cp -f /vagrant/configs/zoo.cfg /opt/zookeeper/conf/zoo.cfg
 
+mkdir -p /var/log/kafka
+chown -R zookeeper:supergroup /var/log/kafka
+
 chown -R zookeeper:supergroup /opt/zookeeper
 
-# done installing packages
-popd #/tmp
+# install kafka
+install_package kafka-0.10.0.1 /opt/kafka http://www.gtlib.gatech.edu/pub/apache/kafka/0.10.0.1/kafka_2.11-0.10.0.1.tgz
+
+chown -R kafka:supergroup /opt/kafka
+
+## misc setup
+
+# make spam user
+add_user "spam"
+cp -r /spam/* /opt/spam
+chown -R spam:supergroup /opt/spam
 
 # set hostnames
 # TODO: this is fuckin gross, proper fix is DNS
