@@ -4,7 +4,7 @@ run_as_user() {
     username=$1
     command=$2
 
-    su - ${username} -c ${command}
+    su - ${username} -c "${command}"
 }
 
 
