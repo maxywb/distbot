@@ -5,6 +5,12 @@ Vagrant.configure("2") do |config|
 
       node.vm.hostname = "node-#{i}"
 
+      config.vm.provider "virtualbox" do |v|
+        v.memory = 8192
+        v.cpus = 2
+      end
+
+
       # TODO: this is fuckin gross, proper fix is DNS
       node.vm.network "private_network", ip: "10.0.0.20#{i}"
       node.vm.network "public_network", mac: "5CA1AB1E000#{i}"
@@ -21,7 +27,7 @@ Vagrant.configure("2") do |config|
 
       config.vm.provision "file", source: "/home/meatwad/prog/src/hdfs-playground/src", destination: "~/spam"
       config.vm.provision "shell", inline: "sudo bash /vagrant/bootstrap.sh"
-
+      config.vm.provision "shell", inline: "sudo bash /vagrant/start_services.sh"
     end
   end
 end

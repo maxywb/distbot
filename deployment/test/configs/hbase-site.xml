@@ -1,0 +1,13 @@
+<configuration>
+   //Here you have to set the path where you want HBase to store its files.
+   <property>
+      <name>hbase.rootdir</name>
+      <value>file:/spam/HBase/HFiles</value>
+   </property>
+	
+   //Here you have to set the path where you want HBase to store its built in zookeeper  files.
+   <property>
+      <name>hbase.zookeeper.property.dataDir</name>
+      <value>/spam/zookeeper</value>
+   </property>
+</configuration>
