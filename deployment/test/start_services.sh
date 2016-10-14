@@ -4,7 +4,7 @@ run_as_user() {
     username=$1
     command=$2
 
-    echo "$(date) starting $(username"
+    echo "$(date) starting ${username}"
 
     su - ${username} -c "${command}"
 }
