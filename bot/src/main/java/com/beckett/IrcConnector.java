@@ -1,55 +1,179 @@
 package com.beckett;
 
-import java.util.Properties;
+import com.beckett.IrcCommand.IrcAction;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.producer.Producer;
-import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.pircbotx.Channel;
+import org.pircbotx.Configuration;
+import org.pircbotx.PircBotX;
+import org.pircbotx.dcc.ReceiveChat;
+import org.pircbotx.exception.DaoException;
+import org.pircbotx.exception.IrcException;
+import org.pircbotx.hooks.ListenerAdapter;
+import org.pircbotx.hooks.events.*;
 
-public class IrcConnector
-{
-  public static void main( String[] args )
-  {
+import javax.net.ssl.SSLSocketFactory;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-    // create instance for properties to access producer configs
-    Properties props = new Properties();
+public class IrcConnector extends ListenerAdapter implements Runnable {
+    private Producer<String, String> producer;
+    private Consumer<String, String> consumer;
+    private PircBotX bot;
+    private AtomicBoolean running = new AtomicBoolean();
+    private static final String PUBLISH_TOPIC = "irc-publish";
 
-    //Assign localhost id
-    props.put("bootstrap.servers", "192.168.1.201:9092");
+    IrcConnector() {
+        this.producer = IrcUtils.getProducer("192.168.1.201:9092");
+        this.consumer = IrcUtils.getConsumer("192.168.1.201:9092",
+                "irc-bot",
+                IrcUtils.Type.IrcListener);
 
-    //Set acknowledgements for producer requests.
-    props.put("acks", "all");
-
-    //If the request fails, the producer can automatically retry,
-    props.put("retries", 0);
-
-    //Specify buffer size in config
-    props.put("batch.size", 16384);
-
-    //Reduce the no of requests less than 0
-    props.put("linger.ms", 1);
-
-    //The buffer.memory controls the total amount of memory available to the producer for buffering.
-    props.put("buffer.memory", 33554432);
-
-    props.put("key.serializer",
-              "org.apache.kafka.common.serialization.StringSerializer");
-
-    props.put("value.serializer",
-              "org.apache.kafka.common.serialization.StringSerializer");
-
-    Producer<String, String> producer = new KafkaProducer(props);
-
-    for(Integer key = 0; key < 10; key++){
-
-      String value = String.format("%d-value", key);
-
-      producer.send(new ProducerRecord<String, String>("test-topic", value));
-                                                       
-      System.out.println("Message sent successfully");
+        this.running.set(true);
     }
-    producer.close();
-  }
 
+    public void setBot(PircBotX bot) {
+        this.bot = bot;
+    }
+
+    /**
+     * listen for kafka commands
+     */
+    public void run() {
+        while (this.running.get()) {
+            ConsumerRecords<String, String> records = consumer.poll(100);
+            for (ConsumerRecord<String, String> record : records) {
+                IrcAction next = IrcMessageConverter.parseAction(record);
+                if (!next.channel.startsWith("#")) {
+                    next.channel = "#" + next.channel;
+                }
+                switch (next.action) {
+                    case Join:
+                        join(next.channel, next.message);
+                        break;
+                    case Part:
+                        part(next.channel, next.message);
+
+                        break;
+                    case Say:
+                        say(next.channel, next.message);
+                        break;
+                }
+            }
+
+        }
+
+    }
+
+    private void part(String channel, String message) {
+        try {
+            Channel c = bot.getUserChannelDao().getChannel(channel);
+            c.send().part(message);
+        } catch (DaoException e) {
+            if (e.getReason() == DaoException.Reason.UnknownChannel) {
+                // log error
+                return;
+            }
+        }
+    }
+
+    private void join(String channel, String key) {
+        try {
+            if (key.equals("")) {
+                bot.send().joinChannel(channel);
+            } else {
+                bot.send().joinChannel(channel, key);
+            }
+        } catch (DaoException e) {
+            if (e.getReason() == DaoException.Reason.UnknownChannel) {
+                // log error
+                return;
+            }
+        }
+    }
+
+    private void say(String channel, String message) {
+        try {
+            Channel dest = bot.getUserChannelDao().getChannel(channel);
+            dest.send().message(message);
+        } catch (DaoException e) {
+            if (e.getReason() == DaoException.Reason.UnknownChannel) {
+                // log error
+                return;
+            }
+        }
+    }
+
+    private void publish(String key, String value) {
+        producer.send(new ProducerRecord<String, String>(PUBLISH_TOPIC, key, value));
+    }
+
+    @Override
+    public void onJoin(JoinEvent event) {
+        publish("on-join", IrcMessageConverter.toJson(event));
+    }
+
+    @Override
+    public void onPart(PartEvent event) {
+        publish("on-part", IrcMessageConverter.toJson(event));
+    }
+
+    @Override
+    public void onKick(KickEvent event) {
+        publish("on-kick", IrcMessageConverter.toJson(event));
+    }
+
+    @Override
+    public void onMessage(MessageEvent event) {
+        publish("on-msg", IrcMessageConverter.toJson(event));
+    }
+
+    @Override
+    public void onPrivateMessage(PrivateMessageEvent event) {
+        publish("on-privmsg", IrcMessageConverter.toJson(event));
+    }
+
+    @Override
+    public void onIncomingChatRequest(IncomingChatRequestEvent event) throws Exception {
+        producer.send(new ProducerRecord<String, String>(PUBLISH_TOPIC, "DCC-init", event.toString()));
+
+        ReceiveChat chat;
+        if (event.getUserHostmask().getHostname().equals("never.knows.best")) {
+            chat = event.accept();
+        } else {
+            event.respond("go away");
+            return;
+        }
+
+        // keep reading lines until the line is null, signaling the end of the connection
+        String line;
+        while ((line = chat.readLine()) != null) {
+            publish("on-dcc", IrcMessageConverter.toJson(event, line));
+        }
+    }
+
+    public static void main(String[] args) throws IOException, IrcException {
+
+        IrcConnector connector = new IrcConnector();
+
+        Configuration configuration = new Configuration.Builder()
+                .setName("boatz")
+                .addServer("irc.rizon.net", 9999)
+                .setSocketFactory(SSLSocketFactory.getDefault())
+                .addAutoJoinChannel("#boatz")
+                .addListener(connector)
+                .setAutoNickChange(true)
+                .buildConfiguration();
+
+        PircBotX bot = new PircBotX(configuration);
+        connector.setBot(bot);
+        (new Thread(connector)).start();
+        // has to happen last!
+        bot.startBot();
+    }
 
 
 }
