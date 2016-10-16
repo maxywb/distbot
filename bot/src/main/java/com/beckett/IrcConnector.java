@@ -46,7 +46,13 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
         while (this.running.get()) {
             ConsumerRecords<String, String> records = consumer.poll(100);
             for (ConsumerRecord<String, String> record : records) {
-                IrcAction next = IrcMessageConverter.parseAction(record);
+                IrcAction next = null;
+                try {
+                    next = IrcMessageConverter.parseAction(record);
+                } catch (Exception e) {
+                    System.out.println(e);
+                    continue;
+                }
                 if (!next.channel.startsWith("#")) {
                     next.channel = "#" + next.channel;
                 }
@@ -73,10 +79,7 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
             Channel c = bot.getUserChannelDao().getChannel(channel);
             c.send().part(message);
         } catch (DaoException e) {
-            if (e.getReason() == DaoException.Reason.UnknownChannel) {
-                // log error
-                return;
-            }
+            System.out.println(e);
         }
     }
 
@@ -88,10 +91,7 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
                 bot.send().joinChannel(channel, key);
             }
         } catch (DaoException e) {
-            if (e.getReason() == DaoException.Reason.UnknownChannel) {
-                // log error
-                return;
-            }
+            System.out.println(e);
         }
     }
 
@@ -100,10 +100,7 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
             Channel dest = bot.getUserChannelDao().getChannel(channel);
             dest.send().message(message);
         } catch (DaoException e) {
-            if (e.getReason() == DaoException.Reason.UnknownChannel) {
-                // log error
-                return;
-            }
+            System.out.println(e);
         }
     }
 

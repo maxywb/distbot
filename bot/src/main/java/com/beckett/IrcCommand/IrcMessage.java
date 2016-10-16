@@ -6,13 +6,14 @@ import org.pircbotx.hooks.events.MessageEvent;
 import org.pircbotx.hooks.events.PrivateMessageEvent;
 
 public class IrcMessage {
-
+    public long timestamp;
     public String message;
     public String nick;
     public String hostmask;
     public String destination;
 
-    public IrcMessage(String message, String nick, String hostmask, String destination) {
+    public IrcMessage(long timestamp, String message, String nick, String hostmask, String destination) {
+        this.timestamp = timestamp;
         this.message = message;
         this.nick = nick;
         this.hostmask = hostmask;
@@ -20,21 +21,25 @@ public class IrcMessage {
     }
 
     public IrcMessage(MessageEvent event) {
-        this(event.getMessage(),
+        this(event.getTimestamp(),
+                event.getMessage(),
                 event.getUserHostmask().getNick(),
                 event.getUserHostmask().getHostmask(),
                 event.getChannelSource());
     }
 
     public IrcMessage(PrivateMessageEvent event) {
-        this(event.getMessage(),
+
+        this(event.getTimestamp(),
+                event.getMessage(),
                 event.getUserHostmask().getNick(),
                 event.getUserHostmask().getHostmask(),
                 "PRIVMSG"); // kinda hacky...
     }
 
     public IrcMessage(IncomingChatRequestEvent event, String line) {
-        this(line, event.getUserHostmask().getNick(),
+        this(event.getTimestamp(),
+                line, event.getUserHostmask().getNick(),
                 event.getUserHostmask().getHostmask(),
                 "DCC"); // kinda hacky...
 

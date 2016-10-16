@@ -1,5 +1,6 @@
 #!/usr/bin/env python2.7
 import json
+import time
 
 import kafka
 
@@ -19,17 +20,22 @@ ME = "boatz"
 
 BASE_ACTION = '''
 {
+  "timestamp":"%(timestamp)s",
   "action":"%(action)s",
   "message":"%(message)s",
   "channel":"%(channel)s"
 }
 '''
 
+def get_millis():
+    return int(round(time.time() * 1000))
+
 def handle_bad_command(message, pieces):
     who = message["nick"]
     where = message["destination"]
 
     return {
+        "timestamp" : get_millis(),
         "action" : "SAY",
         "channel" : where,
         "message" : "%s: no such command %s" % (who, pieces[0])
@@ -40,6 +46,7 @@ def handle_ping(message, pieces):
     where = message["destination"]
 
     return {
+        "timestamp" : get_millis(),
         "action" : "SAY",
         "channel" : where,
         "message" : "%s: pong" % who
@@ -50,6 +57,7 @@ def handle_say(message, pieces):
     where = pieces[1]
     text = " ".join(pieces[2:])
     return {
+        "timestamp" : get_millis(),
         "action" : "SAY",
         "channel" : where,
         "message" : text,
@@ -59,6 +67,7 @@ def handle_join(message, pieces):
     where = pieces[1]
     text = pieces[2:] if len(pieces) >=2 else ""
     return {
+        "timestamp" : get_millis(),
         "action" : "JOIN",
         "channel" : where,
         "message" : text,
@@ -68,6 +77,7 @@ def handle_part(message, pieces):
     where = pieces[1]
     text = pieces[2:] if len(pieces) >=2 else "bye"
     return {
+        "timestamp" : get_millis(),
         "action" : "PART",
         "channel" : where,
         "message" : text,
@@ -88,6 +98,7 @@ def handle_message(channel, message):
     talking_to_me = text.startswith(ME) or (channel in ["on-privmsg", "on-dcc"])
     if message["message"] in [".bots", "!bots"]:
         parts = {
+            "timestamp" : get_millis(),
             "action" : "SAY",
             "channel" : message["destination"],
             "message" : "i'm a robot [java/python]"
@@ -99,6 +110,7 @@ def handle_message(channel, message):
     elif message["hostmask"] != OWNER and talking_to_me:
         
         parts = {
+            "timestamp" : get_millis(),
             "action" : "SAY",
             "channel" : message["destination"],
             "message" : "%s: i don't know you" % message["nick"]
@@ -148,9 +160,7 @@ while True:
         except ValueError:
             print "json parse error: %s" % msg.value
     else:
-        print "i don't know what this is"
-        print msg
-
+        print msg    
 
 
 
