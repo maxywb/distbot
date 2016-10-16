@@ -144,5 +144,7 @@ echo "10.0.0.202 node-2" >> /etc/hosts
 chown -R root:supergroup /spam
 chmod -R g+rw /spam
 
+chown -R hadoop:supergroup /spam/hdfs
+
 # done
 date >> /spam/provision_timestamp
