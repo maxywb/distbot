@@ -6,4 +6,4 @@ run-producer:
 
 run-simple-writer: 
 
-	sudo su - hadoop -c "java -cp /home/meatwad/prog/src/hdfs-playground/bot/target/bot-1.0-SNAPSHOT-jar-with-dependencies.jar com.beckett.SimpleWriter"	
+	sudo su - hadoop -c "java -cp /home/meatwad/prog/src/distbot/bot/target/bot-1.0-SNAPSHOT-jar-with-dependencies.jar com.beckett.SimpleWriter"	

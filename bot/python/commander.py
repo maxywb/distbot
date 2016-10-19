@@ -1,10 +1,13 @@
 #!/usr/bin/env python2.7
 import json
+import logging
 import time
 
 import kafka
+import kazoo.client as kzc
+import kazoo.recipe.watchers as kzw
 
-
+logging.basicConfig()
 
 consumer = kafka.KafkaConsumer(bootstrap_servers="192.168.1.201:9092",                               
                                group_id="irc-bot-commander",
@@ -14,6 +17,41 @@ consumer = kafka.KafkaConsumer(bootstrap_servers="192.168.1.201:9092",
 )
 
 producer = kafka.KafkaProducer(bootstrap_servers="192.168.1.201:9092")
+
+def zk_listener(state):
+    if state == kzc.KazooState.LOST:
+        print("zk connection lost")
+    elif state == kzc.KazooState.SUSPENDED:
+        print("zk connection suspended")
+    else:
+        print("zk connection connected")
+
+
+
+zk = kzc.KazooClient(hosts="192.168.1.201:2181")
+zk.add_listener(zk_listener)
+zk.start()
+
+bad_users = set() # this should probably have a mutex but there's only one writer so...
+@kzw.ChildrenWatch(zk, "/bot/config/ignore")
+def watcher(nodes):
+    global bad_users
+    bad_users = bad_users.union(set(nodes))
+
+def ignore_name(name):
+    path = "/bot/config/ignore/%s" % name
+
+    value = bytes(name, "utf-8")
+    if zk.exists(path) is None:
+        zk.create(path, value=value)
+        bad_users.add(name)
+
+def unignore_name(name):
+    path = "/bot/config/ignore/%s" % name
+
+    if zk.exists(path) is not None:
+        zk.delete(path)
+        bad_users.remove(name)
 
 OWNER = "oatzhakok!~meatwad@never.knows.best"
 ME = "boatz"
@@ -83,14 +121,76 @@ def handle_part(message, pieces):
         "message" : text,
     }
 
-COMMANDS_WITH_OUTPUT={
+def handle_ignore(message, pieces):
+    names = pieces[2:]
+
+    for name in names:
+        ignore_name(name)
+
+    return {
+        "timestamp" : get_millis(),
+        "action" : "SAY",
+        "channel" : message["destination"],
+        "message" : "done",
+    }
+
+def handle_unignore(message, pieces):
+    names = pieces[2:]
+
+    for name in names:
+        unignore_name(name)
+
+    return {
+        "timestamp" : get_millis(),
+        "action" : "SAY",
+        "channel" : message["destination"],
+        "message" : "done",
+    }
+
+COMMANDS={
     "ping": handle_ping,
+}
+
+PRIV_COMMANDS={
+    "ignore": handle_ignore,
+    "unignore": handle_unignore,
     "say": handle_say,
     "join": handle_join,
     "part": handle_part,
 }
 
-bad_users = set()
+rates = dict()
+ten_seconds = 10000
+def rate_limit(message):
+    nick = message["nick"]
+    ts = int(message["timestamp"])
+
+    if nick not in rates:
+        rates[nick] = list()
+
+    rate_list = list()
+    ten_seconds_ago = ts - ten_seconds
+    for r in rates[nick]:
+        if r < ten_seconds_ago:
+            continue
+        rate_list.append(r)
+
+    rate_list.append(ts)
+
+    rates[nick] = rate_list
+
+    if len(rate_list) >= 4:
+        bad_users.add(nick)
+        return True, {
+            "timestamp" : get_millis(),
+            "action" : "SAY",
+            "channel" : message["destination"],
+            "message" : "chill out kid",
+        }        
+    else:
+        bad_users.discard(nick)
+
+    return False, None
 
 def handle_message(channel, message):
     text = message["message"]
@@ -104,17 +204,8 @@ def handle_message(channel, message):
             }
         
     elif message["nick"] in bad_users:
+        rate_limit(message)
         return 
-
-    elif message["hostmask"] != OWNER and talking_to_me:
-        
-        parts = {
-            "timestamp" : get_millis(),
-            "action" : "SAY",
-            "channel" : message["destination"],
-            "message" : "%s: i don't know you" % message["nick"]
-            }
-        bad_users.add(message["nick"])
 
     elif talking_to_me:
         pieces = text.split(" ")
@@ -122,14 +213,32 @@ def handle_message(channel, message):
         if text.startswith(ME):
             pieces = pieces[1:]
 
+        if len(pieces) <= 0:
+            return
+
         command = pieces[0]
 
-        handler = COMMANDS_WITH_OUTPUT.get(command, None)
-
+        handler = COMMANDS.get(command, None)
+        bail = False
         if handler is None:
-            handler = handle_bad_command
+            handler = PRIV_COMMANDS.get(command, None)
+            
+            if handler is None:
+                handler = handle_bad_command
+            elif message["hostmask"] != OWNER:
+                parts = {
+                    "timestamp" : get_millis(),
+                    "action" : "SAY",
+                    "channel" : message["destination"],
+                    "message" : "%s: you can't do that" % message["nick"]
+                }
+                bail = True
+        else:
+            # rate limit
+            bail, parts = rate_limit(message)
 
-        parts = handler(message, pieces)
+        if not bail:
+            parts = handler(message, pieces)
 
     else:
         return
