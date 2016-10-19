@@ -139,6 +139,7 @@ chown -R spam:supergroup /opt/spam
 # TODO: this is fuckin gross, proper fix is DNS
 echo "10.0.0.201 node-1" >> /etc/hosts
 echo "10.0.0.202 node-2" >> /etc/hosts
+echo "192.168.1.15 oldtown" >> /etc/hosts
 
 # set permissions on /spam
 chown -R root:supergroup /spam

@@ -4,6 +4,8 @@ import time
 
 import kafka
 
+
+
 consumer = kafka.KafkaConsumer(bootstrap_servers="192.168.1.201:9092",                               
                                group_id="irc-bot-commander",
                                enable_auto_commit=True,
@@ -83,7 +85,7 @@ def handle_part(message, pieces):
         "message" : text,
     }
 
-COMMANDS={
+COMMANDS_WITH_OUTPUT={
     "ping": handle_ping,
     "say": handle_say,
     "join": handle_join,
@@ -125,7 +127,7 @@ def handle_message(channel, message):
 
         command = pieces[0]
 
-        handler = COMMANDS.get(command, None)
+        handler = COMMANDS_WITH_OUTPUT.get(command, None)
 
         if handler is None:
             handler = handle_bad_command
@@ -135,9 +137,10 @@ def handle_message(channel, message):
     else:
         return
 
-    action = BASE_ACTION % parts
-    
-    producer.send("irc-action", bytes(action))
+    if parts is not None:
+        action = BASE_ACTION % parts
+        action = json.dumps(json.loads(action))
+        producer.send("irc-action", bytes(action))
 
 
 
