@@ -45,7 +45,7 @@ public class IrcUtils {
                 consumer.subscribe(Arrays.asList("irc-action"));
                 break;
             case AllListener:
-              consumer.subscribe(Arrays.asList("irc-action", "irc-publish", "lifting-thing"));
+              consumer.subscribe(Arrays.asList("irc-action", "irc-publish"));
         }
 
         return consumer;
