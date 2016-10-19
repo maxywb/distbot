@@ -15,8 +15,6 @@ consumer = kafka.KafkaConsumer(bootstrap_servers="192.168.1.201:9092",
 
 producer = kafka.KafkaProducer(bootstrap_servers="192.168.1.201:9092")
 
-producer.send("irc-publish", key="disel", value="commander on the clock")
-
 OWNER = "oatzhakok!~meatwad@never.knows.best"
 ME = "boatz"
 
@@ -77,7 +75,7 @@ def handle_join(message, pieces):
 
 def handle_part(message, pieces):
     where = pieces[1]
-    text = pieces[2:] if len(pieces) >=2 else "bye"
+    text = " ".join(pieces[2:]) if len(pieces) >=2 else "bye"
     return {
         "timestamp" : get_millis(),
         "action" : "PART",
@@ -96,7 +94,6 @@ bad_users = set()
 
 def handle_message(channel, message):
     text = message["message"]
-
     talking_to_me = text.startswith(ME) or (channel in ["on-privmsg", "on-dcc"])
     if message["message"] in [".bots", "!bots"]:
         parts = {
@@ -140,8 +137,8 @@ def handle_message(channel, message):
     if parts is not None:
         action = BASE_ACTION % parts
         action = json.dumps(json.loads(action))
-        producer.send("irc-action", bytes(action))
-
+        print("sending:", action)
+        producer.send("irc-action", bytes(action, "utf-8"))
 
 
 # take control of the partitions and don't handle queued messages
@@ -156,17 +153,11 @@ for partition in consumer.partitions_for_topic("irc-publish"):
 while True:
 
     msg = next(consumer)
-    if msg.key in ["on-msg", "on-privmsg", "on-dcc"]:
+    if msg.key in [b"on-msg", b"on-privmsg", b"on-dcc"]:
         try:
-            message = json.loads(msg.value)
-            handle_message(msg.key, message)
+            message = json.loads(msg.value.decode("utf-8"))
+            handle_message(msg.key.decode("utf-8"), message)
         except ValueError:
-            print "json parse error: %s" % msg.value
+            print("json parse error: %s" % msg.value)
     else:
-        print msg    
-
-
-
-
-
-
+        print("no idea what this is", msg)
