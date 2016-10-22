@@ -6,7 +6,7 @@ Present:
 - Kafka
 -- There are currently 2 channels: "irc-publish" for publishing all irc events the bot sees; and "irc-action" for publishing instructions to the bot.
 - Zookeeper
--- Currently I'm working on adding a config-store to ZK for information that all the micro services care about (e.g. an ignore list for Bad Users)
+-- The bot listents to the "/bot/config" tree and will respond to keep itself inline with the desired config. The supported config objects currently are "channels",  "name", and "ignore".
 
 Future:
 - Spark
