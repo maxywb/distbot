@@ -9,6 +9,7 @@ fi
 export PATH=$PATH:/opt/scala/bin
 
 ## add SPARK to path
+export SPARK_HOME=/usr/java/spark
 export PATH=$PATH:/opt/spark/bin
 
 ## JAVA env variables

@@ -80,18 +80,23 @@
     </dependency>
     <dependency>
       <groupId>org.apache.curator</groupId>
-      <artifactId>curator-framework</artifactId>
-      <version>3.2.0</version>
+      <artifactId>curator-client</artifactId>
+      <version>2.9.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.curator</groupId>
-      <artifactId>curator-recipes</artifactId>
-      <version>3.2.0</version>
+      <artifactId>curator-framework</artifactId>
+      <version>2.9.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.curator</groupId>
       <artifactId>curator-test</artifactId>
-      <version>3.2.0</version>
+      <version>2.9.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.curator</groupId>
+      <artifactId>curator-recipes</artifactId>
+      <version>2.9.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>

@@ -23,3 +23,4 @@ run_as_user "hbase" "start-hbase.sh"
 # start kafka
 run_as_user "kafka" "kafka-server-start.sh -daemon /opt/kafka/config/server.properties"
 
+

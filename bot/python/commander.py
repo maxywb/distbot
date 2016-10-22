@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 import json
 import logging
 import time
@@ -26,8 +26,6 @@ def zk_listener(state):
     else:
         print("zk connection connected")
 
-
-
 zk = kzc.KazooClient(hosts="192.168.1.201:2181")
 zk.add_listener(zk_listener)
 zk.start()
@@ -37,6 +35,13 @@ bad_users = set() # this should probably have a mutex but there's only one write
 def watcher(nodes):
     global bad_users
     bad_users = bad_users.union(set(nodes))
+
+my_name = "boatz"
+@kzw.DataWatch(zk, "/bot/config/name")
+def watcher(data, stat, event):
+    global my_name
+    if event is None or event.type == "CHANGED":
+        my_name = data.decode("utf-8")
 
 def ignore_name(name):
     path = "/bot/config/ignore/%s" % name
@@ -54,7 +59,7 @@ def unignore_name(name):
         bad_users.remove(name)
 
 OWNER = "oatzhakok!~meatwad@never.knows.best"
-ME = "boatz"
+
 
 BASE_ACTION = '''
 {
@@ -147,6 +152,57 @@ def handle_unignore(message, pieces):
         "message" : "done",
     }
 
+def handle_config(message, pieces):
+    action = pieces[1]
+    path = "/".join(pieces[2:-1])
+    base_path = "/bot/config/%s"
+    data = pieces[-1].encode("utf-8")
+    
+    text = "done"
+
+    def exists(path):
+        return zk.exists(path) is not None
+
+    if action == "create":
+        real_path = base_path % path
+        if not exists(real_path):
+            zk.create(real_path, data)
+        else:
+            text = "path exists (%s)" % path
+    elif action == "update":
+        real_path = base_path % path
+        if not exists(real_path):
+            text = "path exists (%s)" % path
+        else:
+            zk.set(real_path, data)
+    elif action == "delete":
+        # no data, so all args are pathy
+        path = "%s%s" % (path, data.decode("utf-8"))
+        real_path = base_path % path
+        if not exists(real_path):
+            text = "path doesn't exist (%s)" % path
+        else:
+            zk.delete(real_path)
+    elif action == "get":
+        # no data, so all args are pathy
+        path = "%s%s" % (path, data.decode("utf-8"))
+        real_path = base_path % path
+        if not exists(real_path):
+            text = "path doesn't exist (%s)" % path
+        else:
+            text = zk.get(real_path)[0].decode("utf-8")
+
+    else:
+        text = "unknown action (%s)" % action
+
+
+    return {
+        "timestamp" : get_millis(),
+        "action" : "SAY",
+        "channel" : message["destination"],
+        "message" : text,
+    }
+
 COMMANDS={
     "ping": handle_ping,
 }
@@ -157,6 +213,7 @@ PRIV_COMMANDS={
     "say": handle_say,
     "join": handle_join,
     "part": handle_part,
+    "config": handle_config,
 }
 
 rates = dict()
@@ -194,7 +251,7 @@ def rate_limit(message):
 
 def handle_message(channel, message):
     text = message["message"]
-    talking_to_me = text.startswith(ME) or (channel in ["on-privmsg", "on-dcc"])
+    talking_to_me = text.startswith(my_name) or (channel in ["on-privmsg", "on-dcc"])
     if message["message"] in [".bots", "!bots"]:
         parts = {
             "timestamp" : get_millis(),
@@ -210,7 +267,7 @@ def handle_message(channel, message):
     elif talking_to_me:
         pieces = text.split(" ")
 
-        if text.startswith(ME):
+        if text.startswith(my_name):
             pieces = pieces[1:]
 
         if len(pieces) <= 0:
@@ -259,6 +316,7 @@ for partition in consumer.partitions_for_topic("irc-publish"):
 
     consumer.seek_to_end(tp)
 
+import traceback
 while True:
 
     msg = next(consumer)
@@ -266,7 +324,7 @@ while True:
         try:
             message = json.loads(msg.value.decode("utf-8"))
             handle_message(msg.key.decode("utf-8"), message)
-        except ValueError:
-            print("json parse error: %s" % msg.value)
+        except Exception as e:
+            traceback.print_exc()
     else:
         print("no idea what this is", msg)

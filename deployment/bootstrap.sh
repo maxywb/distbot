@@ -65,6 +65,10 @@ install_package() {
 # set timezone so logs are understandable
 timedatectl set-timezone America/New_York
 
+# install deps
+#yum install -y epel-release
+#yum install -y python34.x86_64
+
 # make supergroup
 groupadd supergroup
 

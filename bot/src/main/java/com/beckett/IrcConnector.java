@@ -1,6 +1,10 @@
 package com.beckett;
 
 import com.beckett.IrcCommand.IrcAction;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.recipes.cache.ChildData;
+import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
+import org.apache.curator.framework.recipes.cache.TreeCacheListener;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -11,28 +15,40 @@ import org.pircbotx.Configuration;
 import org.pircbotx.PircBotX;
 import org.pircbotx.dcc.ReceiveChat;
 import org.pircbotx.exception.DaoException;
-import org.pircbotx.exception.IrcException;
 import org.pircbotx.hooks.ListenerAdapter;
 import org.pircbotx.hooks.events.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLSocketFactory;
-import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class IrcConnector extends ListenerAdapter implements Runnable {
+public class IrcConnector extends ListenerAdapter implements Runnable, TreeCacheListener {
+    private static final Logger log = LoggerFactory.getLogger(IrcConnector.class);
+
     private Producer<String, String> producer;
     private Consumer<String, String> consumer;
     private PircBotX bot;
     private AtomicBoolean running = new AtomicBoolean();
     private static final String PUBLISH_TOPIC = "irc-publish";
+    private ZkConnector zk;
 
-    IrcConnector() {
+    IrcConnector(ZkConnector zk) throws Exception {
+        this.zk = zk;
         this.producer = IrcUtils.getProducer("192.168.1.201:9092");
         this.consumer = IrcUtils.getConsumer("192.168.1.201:9092",
                 "irc-bot",
                 IrcUtils.Type.IrcListener);
 
         this.running.set(true);
+
+        this.registerForConfig();
+    }
+
+    private void registerForConfig() throws Exception {
+        zk.registerTreeListener("/bot/config", this);
     }
 
     public void setBot(PircBotX bot) {
@@ -50,7 +66,7 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
                 try {
                     next = IrcMessageConverter.parseAction(record);
                 } catch (Exception e) {
-                    System.out.println(e);
+                    log.error(e.toString());
                     continue;
                 }
                 if (!next.channel.startsWith("#")) {
@@ -79,7 +95,7 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
             Channel c = bot.getUserChannelDao().getChannel(channel);
             c.send().part(message);
         } catch (DaoException e) {
-            System.out.println(e);
+            log.error(e.toString());
         }
     }
 
@@ -91,7 +107,7 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
                 bot.send().joinChannel(channel, key);
             }
         } catch (DaoException e) {
-            System.out.println(e);
+            log.error(e.toString());
         }
     }
 
@@ -100,7 +116,7 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
             Channel dest = bot.getUserChannelDao().getChannel(channel);
             dest.send().message(message);
         } catch (DaoException e) {
-            System.out.println(e);
+            log.error(e.toString());
         }
     }
 
@@ -152,15 +168,70 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
         }
     }
 
-    public static void main(String[] args) throws IOException, IrcException {
+    public void childEvent(CuratorFramework curator, TreeCacheEvent event) throws Exception {
+        ChildData childData = event.getData();
+        TreeCacheEvent.Type eventType = event.getType();
 
-        IrcConnector connector = new IrcConnector();
+        switch (eventType) {
+            case CONNECTION_SUSPENDED:
+            case CONNECTION_RECONNECTED:
+            case CONNECTION_LOST:
+            case INITIALIZED:
+                return;
+            default:
+        }
+
+        String fullPath = childData.getPath();
+        String path = fullPath.replace("/bot/config/", "");
+
+        if (bot == null || !bot.isConnected()) {
+            log.warn("zk config changed while bot was not connected, this change is being ignored");
+            return;
+        }
+        String payload = new String(childData.getData());
+
+        if (path.equals("name")) {
+            if (eventType == TreeCacheEvent.Type.NODE_UPDATED) {
+                // change nick
+                bot.send().changeNick(payload);
+            }
+        } else if (path.startsWith("channels")) {
+            switch (eventType) {
+                case NODE_ADDED:
+                    // join channel
+                    join(payload, "");
+                    break;
+                case NODE_REMOVED:
+                    // leave channel
+                    part(payload, "bye");
+                    break;
+                default:
+                    // nothing to do
+                    break;
+            }
+        }
+
+    }
+
+    public static void main(String[] args) throws Exception {
+        ZkConnector zk = new ZkConnector("192.168.1.201:2181");
+        zk.blockUntilConnected();
+        String nick = zk.getData("/bot/config/name", String.class);
+        List<String> channels = zk.getChildren("/bot/config/channels");
+        List<String> channelsWithHash = new LinkedList();
+        for (String channel : channels) {
+            String path = "/bot/config/channels/" + channel;
+            String channelWithHash = "#" + zk.getData(path,String.class);
+            channelsWithHash.add(channelWithHash);
+        }
+
+        IrcConnector connector = new IrcConnector(zk);
 
         Configuration configuration = new Configuration.Builder()
-                .setName("boatz")
+                .setName(nick)
                 .addServer("irc.rizon.net", 9999)
                 .setSocketFactory(SSLSocketFactory.getDefault())
-                .addAutoJoinChannel("#boatz")
+                .addAutoJoinChannels(channelsWithHash)
                 .addListener(connector)
                 .setAutoNickChange(true)
                 .buildConfiguration();
@@ -168,7 +239,8 @@ public class IrcConnector extends ListenerAdapter implements Runnable {
         PircBotX bot = new PircBotX(configuration);
         connector.setBot(bot);
         (new Thread(connector)).start();
-        // has to happen last!
+
+        // has to happen last because i guess it's a blocking call
         bot.startBot();
     }
 
