@@ -9,6 +9,8 @@ Present:
 -- The bot listents to the "/bot/config" tree and will respond to keep itself inline with the desired config. The supported config objects currently are "channels",  "name", and "ignore".
 
 Future:
+- Fail-Over 
+-- I want to implement some kind of fail-over for each of the bot components.
 - Spark
 -- I want to enable an irc command to trigger spark queries to do searching or aggregation of the stored data.
 - HBase ?
