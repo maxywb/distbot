@@ -2,10 +2,14 @@
 import json
 import logging
 import time
+import requests
 
 import kafka
 import kazoo.client as kzc
 import kazoo.recipe.watchers as kzw
+
+import weather
+import location
 
 logging.basicConfig()
 
@@ -43,6 +47,28 @@ def watcher(data, stat, event):
     if event is None or event.type == "CHANGED":
         my_name = data.decode("utf-8")
 
+def get_user(zk, nick):
+    path = "/bot/users/%s" % nick
+    if zk.exists(path) is None:
+        return None
+
+    locations = dict()
+    # build up locations
+    locations_path = "%s/%s" % (path, "locations")
+    for location in zk.get_children(locations_path):
+        specific_path = "%s/%s" % (locations_path, location)
+        value = zk.get(specific_path)[0].decode("utf-8")
+        locations[location] = value
+
+    return {
+        "locations" : locations,
+        }
+
+keys = {
+    "google" : zk.get("/bot/config/key/google")[0].decode("utf-8"),
+    "weather" : zk.get("/bot/config/key/weather")[0].decode("utf-8"),
+    }
+
 def ignore_name(name):
     path = "/bot/config/ignore/%s" % name
 
@@ -59,7 +85,6 @@ def unignore_name(name):
         bad_users.remove(name)
 
 OWNER = "oatzhakok!~meatwad@never.knows.best"
-
 
 BASE_ACTION = '''
 {
@@ -84,6 +109,30 @@ def handle_bad_command(message, pieces):
         "message" : "%s: no such command %s" % (who, pieces[0])
     }
 
+def handle_help(message, *args):
+    where = message["destination"]
+
+    base_message = "usage: %s: <command> <space separated arguments>" % my_name
+    blobs = list()
+    blobs.append(base_message)
+    for command in COMMANDS.keys():
+        try:
+            text = COMMAND_HELP_TEXT[command]
+        except KeyError:
+            text = "\"%s\" - undocumented, sorry" % command
+        blobs.append(text)
+
+    text = "; ".join(blobs)
+    text = text.replace('"', '\\"')
+
+    return {
+        "timestamp" : get_millis(),
+        "action" : "SAY",
+        "channel" : where,
+        "message" : text,
+    }
+    
+
 def handle_ping(message, pieces):
     who = message["nick"]
     where = message["destination"]
@@ -93,6 +142,47 @@ def handle_ping(message, pieces):
         "action" : "SAY",
         "channel" : where,
         "message" : "%s: pong" % who
+    }
+
+def handle_weather(message, pieces):
+    where = message["destination"]
+
+    user = get_user(zk, message["nick"])
+    print("user:", user)
+    if user is not None:
+        try:
+            if len(pieces) == 1:
+                query = user["locations"]["default"].split()
+                
+            elif len(pieces) == 2:
+                query = user["locations"][pieces[1]].split()
+            else:
+                query = pieces[1:]
+        except KeyError:
+            query = pieces[1:]            
+    else:
+        query = pieces[1:]
+        
+
+    text = weather.get_weather(keys, query)
+
+    return {
+        "timestamp" : get_millis(),
+        "action" : "SAY",
+        "channel" : where,
+        "message" : text,
+    }
+
+def handle_forecast(message, pieces):
+    where = message["destination"]
+
+    text = weather.get_forecast(keys, pieces[1:])
+
+    return {
+        "timestamp" : get_millis(),
+        "action" : "SAY",
+        "channel" : where,
+        "message" : text,
     }
 
 def handle_say(message, pieces):
@@ -155,7 +245,7 @@ def handle_unignore(message, pieces):
 def handle_config(message, pieces):
     action = pieces[1]
     path = "/".join(pieces[2:-1])
-    base_path = "/bot/config/%s"
+    base_path = "/bot/%s"
     data = pieces[-1].encode("utf-8")
     
     text = "done"
@@ -185,13 +275,22 @@ def handle_config(message, pieces):
             zk.delete(real_path)
     elif action == "get":
         # no data, so all args are pathy
-        path = "%s%s" % (path, data.decode("utf-8"))
+        path = "%s/%s" % (path, data.decode("utf-8"))
         real_path = base_path % path
         if not exists(real_path):
             text = "path doesn't exist (%s)" % path
         else:
             text = zk.get(real_path)[0].decode("utf-8")
-
+    elif action == "get-children":
+        # no data, so all args are pathy
+        path = "%s/%s" % (path, data.decode("utf-8"))
+        real_path = base_path % path
+        if not exists(real_path):
+            text = "path doesn't exist (%s)" % path
+        else:
+            text = ", ".join(zk.get_children(real_path))
+            if text == "":
+                text = "<none>"
     else:
         text = "unknown action (%s)" % action
 
@@ -204,7 +303,17 @@ def handle_config(message, pieces):
     }
 
 COMMANDS={
+    "help":handle_help,
     "ping": handle_ping,
+    "weather": handle_weather,
+    "forecast": handle_forecast,
+}
+
+COMMAND_HELP_TEXT={
+    "help": "\"help\" - print this text",
+    "ping": "\"ping\" - repond with \"<nick>: pong\"",
+    "weather": "\"weather <search terms>\" - respond with the current weather for the given location",
+    "forecast": "\"forecast <search terms>\" - respond with 3 days forcast (including today), normalized to the appropriate timezone",
 }
 
 PRIV_COMMANDS={
@@ -257,7 +366,7 @@ def handle_message(channel, message):
             "timestamp" : get_millis(),
             "action" : "SAY",
             "channel" : message["destination"],
-            "message" : "i'm a robot [java/python]"
+            "message" : "Reporting in! [java/python] https://github.com/maxywb/distbot",
             }
         
     elif message["nick"] in bad_users:
@@ -265,7 +374,7 @@ def handle_message(channel, message):
         return 
 
     elif talking_to_me:
-        pieces = text.split(" ")
+        pieces = text.split()
 
         if text.startswith(my_name):
             pieces = pieces[1:]

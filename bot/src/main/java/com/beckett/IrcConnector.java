@@ -21,8 +21,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLSocketFactory;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class IrcConnector extends ListenerAdapter implements Runnable, TreeCacheListener {
@@ -36,10 +38,11 @@ public class IrcConnector extends ListenerAdapter implements Runnable, TreeCache
     private ZkConnector zk;
 
     IrcConnector(ZkConnector zk) throws Exception {
+        Random r = new Random();
         this.zk = zk;
         this.producer = IrcUtils.getProducer("192.168.1.201:9092");
         this.consumer = IrcUtils.getConsumer("192.168.1.201:9092",
-                "irc-bot",
+                "irc-bot" + r.nextInt(255),
                 IrcUtils.Type.IrcListener);
 
         this.running.set(true);
@@ -223,6 +226,11 @@ public class IrcConnector extends ListenerAdapter implements Runnable, TreeCache
             String path = "/bot/config/channels/" + channel;
             String channelWithHash = "#" + zk.getData(path,String.class);
             channelsWithHash.add(channelWithHash);
+        }
+
+        if (args.length > 0) {
+            nick = args[0];
+            channelsWithHash = Arrays.asList("#" + args[1]);
         }
 
         IrcConnector connector = new IrcConnector(zk);

@@ -23,5 +23,7 @@ public class IrcAction {
         Part,
         @SerializedName("SAY")
         Say,
+        @SerializedName("PRIVMSG")
+        PrivateMessage,
     }
 }
