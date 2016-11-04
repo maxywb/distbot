@@ -13,7 +13,7 @@ def get_weather(keys, query_location):
 
     description = r.json()["weather"][0]["description"]
 
-    message = "%s -  %s, %s" % (location_name, description, temp)
+    message = "%s -  %s, %sf" % (location_name, description, temp)
     return message
 
 def get_forecast(keys, query_location):

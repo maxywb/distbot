@@ -7,13 +7,13 @@ public class IrcAction {
     public long timestamp;
     public Action action;
     public String message;
-    public String channel;
+    public String destination;
 
-    public IrcAction(long timestamp, Action action, String message, String channel) {
+    public IrcAction(long timestamp, Action action, String message, String destination) {
         this.timestamp = timestamp;
         this.action = action;
         this.message = message;
-        this.channel = channel;
+        this.destination = destination;
     }
 
     public enum Action {

@@ -13,6 +13,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.pircbotx.Channel;
 import org.pircbotx.Configuration;
 import org.pircbotx.PircBotX;
+import org.pircbotx.User;
 import org.pircbotx.dcc.ReceiveChat;
 import org.pircbotx.exception.DaoException;
 import org.pircbotx.hooks.ListenerAdapter;
@@ -72,19 +73,22 @@ public class IrcConnector extends ListenerAdapter implements Runnable, TreeCache
                     log.error(e.toString());
                     continue;
                 }
-                if (!next.channel.startsWith("#")) {
-                    next.channel = "#" + next.channel;
+                if (!next.destination.startsWith("#")) {
+                    next.destination = "#" + next.destination;
                 }
                 switch (next.action) {
                     case Join:
-                        join(next.channel, next.message);
+                        join(next.destination, next.message);
                         break;
                     case Part:
-                        part(next.channel, next.message);
+                        part(next.destination, next.message);
 
                         break;
                     case Say:
-                        say(next.channel, next.message);
+                        say(next.destination, next.message);
+                        break;
+                    case PrivateMessage:
+                        privateMessage(next.destination, next.message);
                         break;
                 }
             }
@@ -118,6 +122,15 @@ public class IrcConnector extends ListenerAdapter implements Runnable, TreeCache
         try {
             Channel dest = bot.getUserChannelDao().getChannel(channel);
             dest.send().message(message);
+        } catch (DaoException e) {
+            log.error(e.toString());
+        }
+    }
+
+    private void privateMessage(String nick, String message) {
+        try {
+            User who = bot.getUserChannelDao().getUser(nick);
+            who.send().message(message);
         } catch (DaoException e) {
             log.error(e.toString());
         }
@@ -201,11 +214,11 @@ public class IrcConnector extends ListenerAdapter implements Runnable, TreeCache
         } else if (path.startsWith("channels")) {
             switch (eventType) {
                 case NODE_ADDED:
-                    // join channel
+                    // join destination
                     join(payload, "");
                     break;
                 case NODE_REMOVED:
-                    // leave channel
+                    // leave destination
                     part(payload, "bye");
                     break;
                 default:

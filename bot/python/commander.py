@@ -91,7 +91,7 @@ BASE_ACTION = '''
   "timestamp":"%(timestamp)s",
   "action":"%(action)s",
   "message":"%(message)s",
-  "channel":"%(channel)s"
+  "destination":"%(destination)s"
 }
 '''
 
@@ -105,7 +105,7 @@ def handle_bad_command(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : where,
+        "destination" : where,
         "message" : "%s: no such command %s" % (who, pieces[0])
     }
 
@@ -128,7 +128,7 @@ def handle_help(message, *args):
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : where,
+        "destination" : where,
         "message" : text,
     }
     
@@ -140,7 +140,7 @@ def handle_ping(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : where,
+        "destination" : where,
         "message" : "%s: pong" % who
     }
 
@@ -148,7 +148,7 @@ def handle_weather(message, pieces):
     where = message["destination"]
 
     user = get_user(zk, message["nick"])
-    print("user:", user)
+
     if user is not None:
         try:
             if len(pieces) == 1:
@@ -169,19 +169,35 @@ def handle_weather(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : where,
+        "destination" : where,
         "message" : text,
     }
 
 def handle_forecast(message, pieces):
     where = message["destination"]
 
-    text = weather.get_forecast(keys, pieces[1:])
+    user = get_user(zk, message["nick"])
+
+    if user is not None:
+        try:
+            if len(pieces) == 1:
+                query = user["locations"]["default"].split()
+                
+            elif len(pieces) == 2:
+                query = user["locations"][pieces[1]].split()
+            else:
+                query = pieces[1:]
+        except KeyError:
+            query = pieces[1:]            
+    else:
+        query = pieces[1:]
+
+    text = weather.get_forecast(keys, query)
 
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : where,
+        "destination" : where,
         "message" : text,
     }
 
@@ -192,7 +208,7 @@ def handle_say(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : where,
+        "destination" : where,
         "message" : text,
     }
 
@@ -202,7 +218,7 @@ def handle_join(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "JOIN",
-        "channel" : where,
+        "destination" : where,
         "message" : text,
     }
 
@@ -212,7 +228,7 @@ def handle_part(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "PART",
-        "channel" : where,
+        "destination" : where,
         "message" : text,
     }
 
@@ -225,7 +241,7 @@ def handle_ignore(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : message["destination"],
+        "destination" : message["destination"],
         "message" : "done",
     }
 
@@ -238,7 +254,7 @@ def handle_unignore(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : message["destination"],
+        "destination" : message["destination"],
         "message" : "done",
     }
 
@@ -298,7 +314,7 @@ def handle_config(message, pieces):
     return {
         "timestamp" : get_millis(),
         "action" : "SAY",
-        "channel" : message["destination"],
+        "destination" : message["destination"],
         "message" : text,
     }
 
@@ -350,7 +366,7 @@ def rate_limit(message):
         return True, {
             "timestamp" : get_millis(),
             "action" : "SAY",
-            "channel" : message["destination"],
+            "destination" : message["destination"],
             "message" : "chill out kid",
         }        
     else:
@@ -358,14 +374,14 @@ def rate_limit(message):
 
     return False, None
 
-def handle_message(channel, message):
+def handle_message(destination, message):
     text = message["message"]
-    talking_to_me = text.startswith(my_name) or (channel in ["on-privmsg", "on-dcc"])
+    talking_to_me = text.startswith(my_name) or (destination in ["on-privmsg", "on-dcc"])
     if message["message"] in [".bots", "!bots"]:
         parts = {
             "timestamp" : get_millis(),
             "action" : "SAY",
-            "channel" : message["destination"],
+            "destination" : message["destination"],
             "message" : "Reporting in! [java/python] https://github.com/maxywb/distbot",
             }
         
@@ -395,7 +411,7 @@ def handle_message(channel, message):
                 parts = {
                     "timestamp" : get_millis(),
                     "action" : "SAY",
-                    "channel" : message["destination"],
+                    "destination" : message["destination"],
                     "message" : "%s: you can't do that" % message["nick"]
                 }
                 bail = True

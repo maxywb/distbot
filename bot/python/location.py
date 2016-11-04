@@ -13,7 +13,13 @@ def get_location_description(location):
             name = list(intersect)[0]
             info[name] = attr["short_name"]
 
-    return "%s, %s, %s" % (info["locality"], info["administrative_area_level_1"], info["country"])
+    description = list()
+    for index in ["locality", "administrative_area_level_1", "country"]:
+        value = info.get(index, None)
+        if value is not None:
+            description.append(value)
+
+    return ", ".join(description)
 
 def get_location_details(keys, query_location):
     # get utc_offset for location 
@@ -50,4 +56,4 @@ keys = {
     "weather": "e81fbe4eb94b7a5511e9e76b5dab64ec",
 }
 
-print(get_location_details(keys, "125 cambridgepark drive cambridge ma".split()))
+
