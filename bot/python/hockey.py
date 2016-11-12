@@ -5,7 +5,7 @@ import requests
 import util
 
 HELP_TEXT = "\"hockey <command> <search terms>\""
-DETAIL_HELP_TEXT = "stats|search !season=int space separated search terms"
+DETAIL_HELP_TEXT = "stats|link !season=int space separated search terms"
 
 SEARCH_BASE_URL = "http://www.hockey-reference.com/search/search.fcgi?search="
 BASE_RESULT_URL = "http://www.hockey-reference.com"
@@ -37,7 +37,7 @@ def get_search_type(name):
     else:
         raise ValueError("unknown type %s" % name)
 
-def search(search_type, terms, result_limit=None):
+def search(search_type, terms, result_limit):
     if isinstance(search_type, str):
         search_type = get_search_type(search_type)
 
@@ -107,7 +107,7 @@ def search(search_type, terms, result_limit=None):
 
         results[result_type].append(next_result)
 
-        if (result_limit is not None) and (result_counter >= result_limit):
+        if result_counter >= result_limit:
             break
 
     return results
@@ -212,14 +212,7 @@ def __get_current_season():
     else:
         return now.year + 1
 
-def __get_stats(search_type, results, season):
-    try:
-        result = results[search_type][0]
-    except IndexError:
-        return None
-
-    if season is None:
-        season = __get_current_season()
+def __get_stats(search_type, result, season):
 
     dom = util.get_dom_from_url(result["url"])
 
@@ -233,14 +226,19 @@ def __get_stats(search_type, results, season):
         if season_stats["season"] == season:
             return season_stats
         
-def __get_any_stats(results, season):
+def __select_result(results, result_limit):
+    ret = None
     if len(results[SearchType.Franchise]) > 0:
-        return __get_stats(SearchType.Franchise, results, season)
+        ret = results[SearchType.Franchise][:result_limit]
     else:
-        return __get_stats(SearchType.Player, results, season)
+        ret = results[SearchType.Player][:result_limit]
+    
+    if result_limit == 1:
+        return ret[0]
+    else:
+        return ret
 
-
-def get_stats(search_type, terms, season=None):
+def get_stats(search_type, terms, season):
     if isinstance(search_type, str):
         search_type = get_search_type(search_type)
 
@@ -249,25 +247,30 @@ def get_stats(search_type, terms, season=None):
 
     results = search(search_type, terms, result_limit=1)
 
-    if search_type == SearchType.Any:
-        return __get_any_stats(results, season)
-    else:
-        return __get_stats(search_type, results, season)
+    result = __select_result(results, 1)
+
+    return __get_stats(result["type"], result, season)
 
 
-FORMATS = {
+def get_link(search_type, terms, result_limit):
+    results = search(search_type, terms, result_limit)
+    result = __select_result(results, result_limit)
+    return result
+
+STATS_FORMATS = {
     SearchType.Franchise : "%(season)s %(name)s: GP:%(games)s, W:%(wins)s, L:%(losses)s, OL:%(otl)s, PTS:%(PTS)s, seed:%(seed)s %(playoffs)s",
     SearchType.Player : "%(season)s %(name)s (%(age)s)- %(Tm)s: GP:%(GP)s, G:%(G)s, A:%(A)s, PTS:%(PTS)s, +/-:%(+/-)s, S:%(S)s, FO%%:%(S%)s, PIM:%(PIM)s, ATOI:%(ATOI)smin, HIT:%(HIT)s",
 }
 
-
 def __format_stats(stats):
     stats_type = stats["type"]
 
-    return FORMATS[stats_type] % stats
+    return STATS_FORMATS[stats_type] % stats
 
-def __format_search(results):
-    pass
+def __format_link(result):
+
+    print(result)
+    return "%(name)s - %(url)s" % result
 
 def execute_command(query):
     season = __get_current_season()
@@ -295,20 +298,21 @@ def execute_command(query):
 
         i += 1
 
+    command = query[0].lower()
+    if command == "help":
+        return DETAIL_HELP_TEXT
+
     if len(query) < 2:
         raise HockeyError(HockeyErrorCode.No_Search_Terms, "must provide search terms")
-
-    command = query[0].lower()
+    
     terms = query[1:]
 
     if command == "stats":
         stats = get_stats(search_type, terms, season=season)
         return __format_stats(stats)
-    elif command == "search":
-        results = search(search_type, ["boston","bruins"], result_limit=1)
-        return __format_search(results)
-    elif command == "help":
-        return DETAIL_HELP_TEXT
+    elif command == "link":
+        results = get_link(search_type, terms, 1)
+        return __format_link(results)
     else:
         raise HockeyError(HockeyErrorCode.Unknown_Command, "unknown command: %s" % command)
 
@@ -322,16 +326,16 @@ def __test():
     results = search(SearchType.Player, ["boston","bruins"])
     assert len(results[SearchType.Franchise]) == 0, len(results[SearchType.Franchise])
 
-    results = search(SearchType.Franchise, ["boston","bruins"], result_limit=1)
+    results = search(SearchType.Franchise, ["boston","bruins"], 1)
     assert len(results[SearchType.Franchise]) == 1, len(results[SearchType.Franchise])
 
-    results = search("team", ["boston","bruins"], result_limit=1)
+    results = search("team", ["boston","bruins"], 1)
     assert len(results[SearchType.Franchise]) == 1, len(results[SearchType.Franchise])
 
     results = search(SearchType.Player, ["seguin"])
     assert len(results[SearchType.Player]) == 3, len(results[SearchType.Player])
 
-    results = search(SearchType.Any, ["cal"], result_limit=1)
+    results = search(SearchType.Any, ["cal"], 1)
     assert len(results[SearchType.Franchise]) == 0, len(results[SearchType.Franchise])
     assert len(results[SearchType.Player]) == 1, len(results[SearchType.Player])
 
