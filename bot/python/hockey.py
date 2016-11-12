@@ -15,6 +15,7 @@ class HockeyErrorCode(enum.Enum):
     No_Search_Terms = 0
     Bad_Season_Format = 1
     Unknown_Command = 2
+    No_Format = 3
 
 class HockeyError(Exception):
     def __init__(self, code, message):
@@ -258,14 +259,26 @@ def get_link(search_type, terms, result_limit):
     return result
 
 STATS_FORMATS = {
-    SearchType.Franchise : "%(season)s %(name)s: GP:%(games)s, W:%(wins)s, L:%(losses)s, OL:%(otl)s, PTS:%(PTS)s, seed:%(seed)s %(playoffs)s",
-    SearchType.Player : "%(season)s %(name)s (%(age)s)- %(Tm)s: GP:%(GP)s, G:%(G)s, A:%(A)s, PTS:%(PTS)s, +/-:%(+/-)s, S:%(S)s, FO%%:%(S%)s, PIM:%(PIM)s, ATOI:%(ATOI)smin, HIT:%(HIT)s",
+    SearchType.Franchise : [
+        "%(season)s %(name)s: GP:%(games)s, W:%(wins)s, L:%(losses)s, OL:%(otl)s, PTS:%(PTS)s, seed:%(seed)s %(playoffs)s",
+    ],
+    SearchType.Player : [
+        "%(season)s %(name)s %(age)sy/o - %(Tm)s: GP:%(GP)s, G:%(G)s, A:%(A)s, PTS:%(PTS)s, +/-:%(+/-)s, S:%(S)s, FO%%:%(S%)s, PIM:%(PIM)s, ATOI:%(ATOI)smin, HIT:%(HIT)s",
+        "%(season)s %(name)s %(age)sy/o - %(Tm)s: GP:%(games_goalie)s, GS:%(starts_goalie)s, W:%(wins_goalie)s, L:%(losses_goalie)s, OTL:%(ties_goalie)s, SV%%:%(save_pct)s, GAA:%(goals_against_avg)s, SO:%(shutouts)s",
+        ],
 }
 
 def __format_stats(stats):
     stats_type = stats["type"]
 
-    return STATS_FORMATS[stats_type] % stats
+    for stats_format in STATS_FORMATS[stats_type]:
+        try:
+            return stats_format % stats
+        except KeyError as e:
+            continue
+
+    raise HockeyError(HockeyErrorCode.No_Format, "no format for: %s" % str(stats))
+
 
 def __format_link(result):
 
