@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 import json
 import logging
-import time
 import requests
+import sys
+import time
+import traceback
 
 import kafka
 import kazoo.client as kzc
 import kazoo.recipe.watchers as kzw
 
+import hockey
 import weather
-import location
 
 logging.basicConfig()
 
@@ -201,6 +203,23 @@ def handle_forecast(message, pieces):
         "message" : text,
     }
 
+def handle_hockey(message, pieces):
+    where = message["destination"]
+
+    query = pieces[1:]
+
+    try:
+        text = hockey.execute_command(query)
+    except hockey.HockeyError as e:
+        text = str(e).replace("'","")
+
+    return {
+        "timestamp" : get_millis(),
+        "action" : "SAY",
+        "destination" : where,
+        "message" : text,
+    }
+
 def handle_say(message, pieces):
     who = message["nick"]
     where = pieces[1]
@@ -323,6 +342,7 @@ COMMANDS={
     "ping": handle_ping,
     "weather": handle_weather,
     "forecast": handle_forecast,
+    "hockey": handle_hockey,
 }
 
 COMMAND_HELP_TEXT={
@@ -330,6 +350,7 @@ COMMAND_HELP_TEXT={
     "ping": "\"ping\" - repond with \"<nick>: pong\"",
     "weather": "\"weather <search terms>\" - respond with the current weather for the given location",
     "forecast": "\"forecast <search terms>\" - respond with 3 days forcast (including today), normalized to the appropriate timezone",
+    "hockey": hockey.HELP_TEXT,
 }
 
 PRIV_COMMANDS={
@@ -441,9 +462,12 @@ for partition in consumer.partitions_for_topic("irc-publish"):
 
     consumer.seek_to_end(tp)
 
-import traceback
-while True:
+try:
+    debug = sys.argv[1].lower() == "debug"
+except IndexError:
+    debug = False
 
+while True:
     msg = next(consumer)
     if msg.key in [b"on-msg", b"on-privmsg", b"on-dcc"]:
         try:
@@ -451,5 +475,5 @@ while True:
             handle_message(msg.key.decode("utf-8"), message)
         except Exception as e:
             traceback.print_exc()
-    else:
+    elif debug:
         print("no idea what this is", msg)
