@@ -279,10 +279,8 @@ def __format_stats(stats):
 
     raise HockeyError(HockeyErrorCode.No_Format, "no format for: %s" % str(stats))
 
-
 def __format_link(result):
 
-    print(result)
     return "%(name)s - %(url)s" % result
 
 def execute_command(query):
@@ -294,9 +292,8 @@ def execute_command(query):
         end = equals + 1
         
         query[start] = "%s=%s" % (query[start], query[end])
-        del query[equals]
-        del query[equals] # due to shift, just delete the same place twice
-        
+        del query[equals:end+1]
+
     i = 0
     while i < len(query):
         if query[i].startswith("!season"):
