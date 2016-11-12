@@ -5,7 +5,7 @@ import requests
 import util
 
 HELP_TEXT = "\"hockey <command> <search terms>\""
-DETAIL_HELP_TEXT = "stats|link !season=int space separated search terms"
+DETAIL_HELP_TEXT = "stats|link|lastgame|schedule !season=int space separated search terms"
 
 SEARCH_BASE_URL = "http://www.hockey-reference.com/search/search.fcgi?search="
 BASE_RESULT_URL = "http://www.hockey-reference.com"
