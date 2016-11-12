@@ -164,7 +164,7 @@ IGNORE_ATTRIBUTES = {
     ]
 }
 
-def __extract_season_stats(row, ignored_attributes):
+def __extract_row(row, ignored_attributes):
     stats = dict()
 
     for col in row:
@@ -213,16 +213,16 @@ def __get_current_season():
     else:
         return now.year + 1
 
-def __get_stats(search_type, result, season):
+def __get_stats(result_type, result, season):
 
     dom = util.get_dom_from_url(result["url"])
 
-    stats_table = dom.find_class("table_outer_container")[TABLE_OFFSET[search_type]][0][0][3]
+    stats_table = dom.find_class("table_outer_container")[TABLE_OFFSET[result_type]][0][0][3]
     
     for row in stats_table:
 
-        season_stats = __extract_season_stats(row, IGNORE_ATTRIBUTES[search_type])
-        season_stats["type"] = search_type
+        season_stats = __extract_row(row, IGNORE_ATTRIBUTES[result_type])
+        season_stats["type"] = result_type
         season_stats["name"] = result["name"]
         if season_stats["season"] == season:
             return season_stats
@@ -239,22 +239,20 @@ def __select_result(results, result_limit):
     else:
         return ret
 
-def get_stats(search_type, terms, season):
-    if isinstance(search_type, str):
-        search_type = get_search_type(search_type)
+def get_stats(terms, season):
 
     if not isinstance(terms, list):
         raise ValueError("terms must be a list")
 
-    results = search(search_type, terms, result_limit=1)
+    results = search(SearchType.Any, terms, result_limit=1)
 
     result = __select_result(results, 1)
 
     return __get_stats(result["type"], result, season)
 
 
-def get_link(search_type, terms, result_limit):
-    results = search(search_type, terms, result_limit)
+def get_link(terms, result_limit):
+    results = search(SearchType.Any, terms, result_limit)
     result = __select_result(results, result_limit)
     return result
 
@@ -268,6 +266,35 @@ STATS_FORMATS = {
         ],
 }
 
+def get_games(terms, season):
+    results = search(SearchType.Any, terms, 1)
+    result = __select_result(results, 1)
+    
+    url = "%s%s_games.html" % (result["url"], season)
+    dom = util.get_dom_from_url(url)
+
+    games_table = dom.find_class("stats_table")[0][3]
+
+    played = list()
+    upcoming = list()
+    for r in games_table:
+        row = __extract_row(r, [])
+
+        row["name"] = result["name"]
+
+        if row["game_location"] != "@":
+            row["game_location"] = "vs"
+
+        if row["game_outcome"] == "" :
+            upcoming.append(row)
+        else:
+            outcome = row["game_outcome"]
+            row["opp_outcome"] = "L" if outcome == "W" else "W"
+
+            played.append(row)
+
+    return played, upcoming
+
 def __format_stats(stats):
     stats_type = stats["type"]
 
@@ -280,12 +307,22 @@ def __format_stats(stats):
     raise HockeyError(HockeyErrorCode.No_Format, "no format for: %s" % str(stats))
 
 def __format_link(result):
-
     return "%(name)s - %(url)s" % result
+
+def __format_last_game(game):
+    last_game_format = "%(date_game)s -- %(name)s(%(game_outcome)s): G:%(G)s, S:%(S)s, PIM:%(PIM)s - %(game_location)s -  %(opp_name)s(%(opp_outcome)s): G:%(opp_goals)s, S:%(shots_against)s, PIM:%(pen_min_opp)s"
+
+    return last_game_format % game
+def __format_schedule(games):
+    schedule_format = "%(date_game)s %(time_game)s %(game_location)s %(opp_name)s"
+
+    prefix = "%(name)s: " % games[0]
+    
+    return prefix + ", ".join([schedule_format % game for game in games])
 
 def execute_command(query):
     season = __get_current_season()
-    search_type = SearchType.Any
+
     if "=" in query:
         equals = query.index("=")
         start = equals - 1
@@ -318,11 +355,17 @@ def execute_command(query):
     terms = query[1:]
 
     if command == "stats":
-        stats = get_stats(search_type, terms, season=season)
+        stats = get_stats(terms, season=season)
         return __format_stats(stats)
     elif command == "link":
-        results = get_link(search_type, terms, 1)
+        results = get_link(terms, 1)
         return __format_link(results)
+    elif command == "lastgame":
+        played_games, upcoming_games = get_games(terms, season)
+        return __format_last_game(played_games[-1])
+    elif command == "schedule":
+        played_games, upcoming_games = get_games(terms, season)
+        return __format_schedule(upcoming_games[:3])
     else:
         raise HockeyError(HockeyErrorCode.Unknown_Command, "unknown command: %s" % command)
 
@@ -380,10 +423,8 @@ def __test():
 
 if __name__ == "__main__":
 
-    text = execute_command("stats seguin".split())
+    text = execute_command("schedule bruins".split())
     print(text)
 
-    text = execute_command("stats !season=2012 boston".split())
-    print(text)
 
     #__test()
