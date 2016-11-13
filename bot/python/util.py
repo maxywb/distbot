@@ -30,5 +30,7 @@ def get_dom_from_url(url, allow_redirects=False):
     if request.status_code == 302:
         raise RedirectError()
 
-    return lxml.html.fromstring(request.text), request.url
-    
+    if allow_redirects:
+        return lxml.html.fromstring(request.text), request.url
+    else:
+        return lxml.html.fromstring(request.text)

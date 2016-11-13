@@ -38,6 +38,27 @@ def get_search_type(name):
     else:
         raise ValueError("unknown type %s" % name)
 
+def __get_name_type_and_url(url):
+    dom, url = util.get_dom_from_url(url, allow_redirects=True)
+
+    if "players" in url:
+        result_type = SearchType.Player
+    elif "teams" in url:
+        result_type = SearchType.Franchise
+
+    if result_type == SearchType.Franchise:
+        name = dom.find_class("teams")[0][0][1][0][0]
+    elif result_type == SearchType.Player:
+        try:
+            name = dom.find_class("players")[0][0][2][0]
+        except IndexError:
+            # maybe a legacy player
+            name = dom.find_class("players")[0][0][0][0]
+    else:
+        raise RuntimeError("unsupported type %s" % result_type)
+
+    return name.text.strip(), result_type, url
+
 def search(search_type, terms, result_limit):
     if isinstance(search_type, str):
         search_type = get_search_type(search_type)
@@ -53,21 +74,16 @@ def search(search_type, terms, result_limit):
     }
 
     try:
-        dom, _ = util.get_dom_from_url(url, allow_redirects=False)
+        dom = util.get_dom_from_url(url)
     except util.RedirectError:
         # redirect means only a single result
-        _, url = util.get_dom_from_url(url, allow_redirects=True)
-        
-        if "players" in url:
-            results[SearchType.Player].append({
-                "url" : url,
-                "type" : SearchType.Player
-            })
-        elif "teams" in url:
-            results[SearchType.Franchise].append({
-                "url" : url,
-                "type" : SearchType.Franchise,
-            })
+        name, type, url = __get_name_type_and_url(url)
+        results[SearchType.Player].append({
+            "url" : url,
+            "type" : type,
+            "name" : name,
+        })
+       
         return results
 
     search_results = dom.find_class("search-item")
@@ -229,25 +245,9 @@ def __get_current_season():
     else:
         return now.year + 1
 
-def __extract_name(result_type, dom):
-    
-
-    if result_type == SearchType.Franchise:
-        name = dom.find_class("teams")[0][0][1][0][0]
-    elif result_type == SearchType.Player:
-        try:
-            name = dom.find_class("players")[0][0][2][0]
-        except IndexError:
-            # maybe a legacy player
-            name = dom.find_class("players")[0][0][0][0]
-    else:
-        raise RuntimeError("unsupported type %s" % result_type)
-
-    return name.text.strip()
-
 def __get_stats(result_type, result, season):
 
-    dom, _ = util.get_dom_from_url(result["url"])
+    dom = util.get_dom_from_url(result["url"])
 
     try:
         stats_table = dom.find_class("table_outer_container")[TABLE_OFFSET[result_type]][0][0][3]
@@ -261,7 +261,7 @@ def __get_stats(result_type, result, season):
         season_stats = __extract_row(row, IGNORE_ATTRIBUTES[result_type])
         season_stats["url"] = result["url"]
         season_stats["type"] = result_type
-        season_stats["name"] = result.get("name", name)
+        season_stats["name"] = result["name"]
         if season_stats["season"] == season:
             return season_stats
 
@@ -311,7 +311,7 @@ def get_games(terms, season):
     result = __select_result(results, 1)
     
     url = "%s%s_games.html" % (result["url"], season)
-    dom, _ = util.get_dom_from_url(url)
+    dom = util.get_dom_from_url(url)
 
     games_table = dom.find_class("stats_table")[0][3]
 
