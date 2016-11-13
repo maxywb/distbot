@@ -47,14 +47,30 @@ def search(search_type, terms, result_limit):
 
     url = SEARCH_BASE_URL + "+".join(terms)
 
-    dom = util.get_dom_from_url(url)
-
-    search_results = dom.find_class("search-item")
-
     results = {
         SearchType.Franchise : list(),
         SearchType.Player : list(),
     }
+
+    try:
+        dom, _ = util.get_dom_from_url(url, allow_redirects=False)
+    except util.RedirectError:
+        # redirect means only a single result
+        _, url = util.get_dom_from_url(url, allow_redirects=True)
+        
+        if "players" in url:
+            results[SearchType.Player].append({
+                "url" : url,
+                "type" : SearchType.Player
+            })
+        elif "teams" in url:
+            results[SearchType.Franchise].append({
+                "url" : url,
+                "type" : SearchType.Franchise,
+            })
+        return results
+
+    search_results = dom.find_class("search-item")
 
     result_counter = 0
 
@@ -213,20 +229,44 @@ def __get_current_season():
     else:
         return now.year + 1
 
+def __extract_name(result_type, dom):
+    
+
+    if result_type == SearchType.Franchise:
+        name = dom.find_class("teams")[0][0][1][0][0]
+    elif result_type == SearchType.Player:
+        try:
+            name = dom.find_class("players")[0][0][2][0]
+        except IndexError:
+            # maybe a legacy player
+            name = dom.find_class("players")[0][0][0][0]
+    else:
+        raise RuntimeError("unsupported type %s" % result_type)
+
+    return name.text.strip()
+
 def __get_stats(result_type, result, season):
 
-    dom = util.get_dom_from_url(result["url"])
+    dom, _ = util.get_dom_from_url(result["url"])
 
-    stats_table = dom.find_class("table_outer_container")[TABLE_OFFSET[result_type]][0][0][3]
-    
+    try:
+        stats_table = dom.find_class("table_outer_container")[TABLE_OFFSET[result_type]][0][0][3]
+    except IndexError:
+        # maybe a legacy player
+        stats_table = dom.find_class("table_outer_container")[0][0][0][3]
+
+    name = __extract_name(result_type, dom)
+
     for row in stats_table:
-
         season_stats = __extract_row(row, IGNORE_ATTRIBUTES[result_type])
+        season_stats["url"] = result["url"]
         season_stats["type"] = result_type
-        season_stats["name"] = result["name"]
+        season_stats["name"] = result.get("name", name)
         if season_stats["season"] == season:
             return season_stats
-        
+
+    return season_stats    
+
 def __select_result(results, result_limit):
     ret = None
     if len(results[SearchType.Franchise]) > 0:
@@ -271,7 +311,7 @@ def get_games(terms, season):
     result = __select_result(results, 1)
     
     url = "%s%s_games.html" % (result["url"], season)
-    dom = util.get_dom_from_url(url)
+    dom, _ = util.get_dom_from_url(url)
 
     games_table = dom.find_class("stats_table")[0][3]
 
@@ -304,7 +344,8 @@ def __format_stats(stats):
         except KeyError as e:
             continue
 
-    raise HockeyError(HockeyErrorCode.No_Format, "no format for: %s" % str(stats))
+    return "no stats for %s in the %d season: %s" % (stats["name"], stats["season"], stats["url"])
+
 
 def __format_link(result):
     return "%(name)s - %(url)s" % result
@@ -423,8 +464,9 @@ def __test():
 
 if __name__ == "__main__":
 
-    text = execute_command("schedule bruins".split())
+    text = execute_command("stats horvat".split())
     print(text)
 
-
+    text = execute_command("stats  bruins".split())
+    print(text)
     #__test()
