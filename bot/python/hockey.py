@@ -255,8 +255,6 @@ def __get_stats(result_type, result, season):
         # maybe a legacy player
         stats_table = dom.find_class("table_outer_container")[0][0][0][3]
 
-    name = __extract_name(result_type, dom)
-
     for row in stats_table:
         season_stats = __extract_row(row, IGNORE_ATTRIBUTES[result_type])
         season_stats["url"] = result["url"]
