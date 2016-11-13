@@ -335,7 +335,7 @@ def get_games(terms, season):
 
     return played, upcoming
 
-def __format_stats(stats):
+def __format_stats(stats, season):
     stats_type = stats["type"]
 
     for stats_format in STATS_FORMATS[stats_type]:
@@ -344,7 +344,7 @@ def __format_stats(stats):
         except KeyError as e:
             continue
 
-    return "no stats for %s in the %d season: %s" % (stats["name"], stats["season"], stats["url"])
+    return "no stats for %s in the %d season: %s" % (stats["name"], season, stats["url"])
 
 
 def __format_link(result):
@@ -397,7 +397,7 @@ def execute_command(query):
 
     if command == "stats":
         stats = get_stats(terms, season=season)
-        return __format_stats(stats)
+        return __format_stats(stats, season)
     elif command == "link":
         results = get_link(terms, 1)
         return __format_link(results)
@@ -411,13 +411,13 @@ def execute_command(query):
         raise HockeyError(HockeyErrorCode.Unknown_Command, "unknown command: %s" % command)
 
 def __test():
-    results = search("player", ["boston","bruins"])
+    results = search("player", ["boston","bruins"], 1)
     assert len(results[SearchType.Franchise]) == 0, len(results[SearchType.Franchise])
 
-    results = search("playER", ["boston","bruins"])
+    results = search("playER", ["boston","bruins"], 1)
     assert len(results[SearchType.Franchise]) == 0, len(results[SearchType.Franchise])
 
-    results = search(SearchType.Player, ["boston","bruins"])
+    results = search(SearchType.Player, ["boston","bruins"], 1)
     assert len(results[SearchType.Franchise]) == 0, len(results[SearchType.Franchise])
 
     results = search(SearchType.Franchise, ["boston","bruins"], 1)
@@ -426,17 +426,17 @@ def __test():
     results = search("team", ["boston","bruins"], 1)
     assert len(results[SearchType.Franchise]) == 1, len(results[SearchType.Franchise])
 
-    results = search(SearchType.Player, ["seguin"])
+    results = search(SearchType.Player, ["seguin"], 99)
     assert len(results[SearchType.Player]) == 3, len(results[SearchType.Player])
 
     results = search(SearchType.Any, ["cal"], 1)
     assert len(results[SearchType.Franchise]) == 0, len(results[SearchType.Franchise])
     assert len(results[SearchType.Player]) == 1, len(results[SearchType.Player])
 
-    stats = get_stats(SearchType.Player, ["seguin"], season=2017)
+    stats = get_stats(["seguin"], 2017)
     assert stats["age"] == 25, stats["age"]
 
-    stats = get_stats(SearchType.Franchise, ["boston"], season=2012)
+    stats = get_stats(["boston"], 2012)
     assert stats["losses"] == 29, stats["losses"]
 
     try:
@@ -463,10 +463,10 @@ def __test():
     print("probably good")
 
 if __name__ == "__main__":
-
-    text = execute_command("stats horvat".split())
-    print(text)
-
-    text = execute_command("stats  bruins".split())
-    print(text)
-    #__test()
+    import sys
+    
+    if len(sys.argv) > 1:
+        text = execute_command(sys.argv[1:])
+        print(text)
+    else:
+        __test()
