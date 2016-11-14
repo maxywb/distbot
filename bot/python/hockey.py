@@ -308,17 +308,28 @@ def get_games(terms, season):
     results = search(SearchType.Any, terms, 1)
     result = __select_result(results, 1)
     
-    url = "%s%s_games.html" % (result["url"], season)
+    if result["type"] == SearchType.Franchise:
+        url = "%s%s_games.html" % (result["url"], season)
+    else:
+        url = result["url"]
+
+
     dom = util.get_dom_from_url(url)
 
     games_table = dom.find_class("stats_table")[0][3]
 
     played = list()
     upcoming = list()
+
     for r in games_table:
         row = __extract_row(r, [])
 
         row["name"] = result["name"]
+        row["type"] = result["type"]
+        row["url"] = result["url"]
+
+        if result["type"] == SearchType.Player:
+            row["game_outcome"] = row["game_result"]
 
         if row["game_location"] != "@":
             row["game_location"] = "vs"
@@ -348,10 +359,28 @@ def __format_stats(stats, season):
 def __format_link(result):
     return "%(name)s - %(url)s" % result
 
-def __format_last_game(game):
-    last_game_format = "%(date_game)s -- %(name)s(%(game_outcome)s): G:%(G)s, S:%(S)s, PIM:%(PIM)s - %(game_location)s -  %(opp_name)s(%(opp_outcome)s): G:%(opp_goals)s, S:%(shots_against)s, PIM:%(pen_min_opp)s"
+LASTGAME_FORMATS = {
+    SearchType.Franchise : [
+        "%(date_game)s -- %(name)s(%(game_outcome)s): G:%(G)s, S:%(S)s, PIM:%(PIM)s - %(game_location)s -  %(opp_name)s(%(opp_outcome)s): G:%(opp_goals)s, S:%(shots_against)s, PIM:%(pen_min_opp)s",
+    ],
+    SearchType.Player : [
+        "%(date_game)s -- %(name)s - %(Tm)s(%(game_result)s) %(game_location)s %(opp_id)s - G:%(G)s, A:%(A)s, +/-:%(+/-)s, S:%(S)s, FO%%:%(S%)s, PIM:%(PIM)s, TOI:%(time_on_ice)smin, HIT:%(hits_all)s",
+        "%(date_game)s -- %(name)s -  %(Tm)s(%(game_result)s) %(game_location)s %(opp_id)s - GA:%(goals_against)s, SA:%(shots_against)s, SV:%(saves)s, SV%%:%(save_pct)s",
+        ],
+}
 
-    return last_game_format % game
+
+def __format_last_game(game):
+    lastgame_type = game["type"]
+
+    for lastgame_format in LASTGAME_FORMATS[lastgame_type]:
+        try:
+            return lastgame_format % game
+        except KeyError as e:
+            continue
+
+    return "no lastgame for %s: %s" % (game["name"], game["url"])
+
 def __format_schedule(games):
     schedule_format = "%(date_game)s %(time_game)s %(game_location)s %(opp_name)s"
 
@@ -457,6 +486,34 @@ def __test():
 
     text = execute_command("help".split())
     assert text == DETAIL_HELP_TEXT
+
+
+    test_commands = [
+        "stats bruins",
+        "link bruins",
+        "lastgame bruins",
+        "schedule bruins",
+        "stats seguin",
+        "link seguin",
+        "lastgame seguin",
+        "stats horvat",
+        "link horvat",
+        "lastgame horvat",
+        "stats bo horvat",
+        "link bo horvat",
+        ]
+
+    bad_commands = [
+        "lastgame seguin",
+        "schedule seguin",
+        "lastgame bo horvat",
+        "schedule bo horvat",
+        ]
+
+    for tc in test_commands:
+        print("executing:", tc)
+        text = execute_command(tc.split())
+        print("result:   ", text)
 
     print("probably good")
 
