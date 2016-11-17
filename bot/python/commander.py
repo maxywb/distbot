@@ -11,6 +11,7 @@ import kazoo.client as kzc
 import kazoo.recipe.watchers as kzw
 
 import hockey
+import util
 import weather
 
 logging.basicConfig()
@@ -231,6 +232,21 @@ def handle_say(message, pieces):
         "message" : text,
     }
 
+def handle_privmsg(message, pieces):
+    ret = handle_say(message, pieces)
+    ret["action"] = "PRIVMSG"
+    return ret
+
+def handle_ip(message, pieces):
+    dom = util.get_dom_from_url("http://www.networksecuritytoolkit.org/nst/tools/ip.shtml")
+    ip = dom.text.strip()
+    return {
+        "timestamp" : get_millis(),
+        "action" : "PRIVMSG",
+        "destination" : message["nick"],
+        "message" : "your ip is: %s" % ip,
+    }
+
 def handle_join(message, pieces):
     where = pieces[1]
     text = pieces[2:] if len(pieces) >=2 else ""
@@ -357,9 +373,11 @@ PRIV_COMMANDS={
     "ignore": handle_ignore,
     "unignore": handle_unignore,
     "say": handle_say,
+    "privmsg": handle_privmsg,
     "join": handle_join,
     "part": handle_part,
     "config": handle_config,
+    "ip": handle_ip,
 }
 
 rates = dict()
@@ -447,6 +465,9 @@ def handle_message(destination, message):
         return
 
     if parts is not None:
+        if parts["destination"] == "PRIVMSG":
+            parts["destination"] = message["nick"]
+            parts["action"] = "PRIVMSG"
         action = BASE_ACTION % parts
         action = json.dumps(json.loads(action))
         print("sending:", action)

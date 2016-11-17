@@ -128,6 +128,9 @@ public class IrcConnector extends ListenerAdapter implements Runnable, TreeCache
     }
 
     private void privateMessage(String nick, String message) {
+      if (nick.startsWith("#")) {
+        nick = nick.substring(1);
+      }
         try {
             User who = bot.getUserChannelDao().getUser(nick);
             who.send().message(message);

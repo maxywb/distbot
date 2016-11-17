@@ -1,16 +1,20 @@
+#!/bin/bash
 
 # Source global definitions
 if [ -f /etc/bashrc ]; then
 	. /etc/bashrc
 fi
 
-
 ## add SCALA to path
 export PATH=$PATH:/opt/scala/bin
 
 ## add SPARK to path
-export SPARK_HOME=/usr/java/spark
-export PATH=$PATH:/opt/spark/bin
+export SPARK_HOME=/opt/spark
+export PYTHONPATH=$PATH:$SPARK_HOME/python
+
+if [ "$USER" == "spark" ]; then
+    export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
+fi
 
 ## JAVA env variables
 export JAVA_HOME=/usr/java/default
@@ -25,18 +29,24 @@ export HADOOP_MAPRED_HOME=$HADOOP_HOME
 export HADOOP_YARN_HOME=$HADOOP_HOME
 export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"
 export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native
-export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin
+
+if [ "$USER" == "hadoop" ]; then
+    export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin
+fi
 
 ## ZOOKEEPER variables
 export ZOOKEEPER_HOME=/opt/zookeeper
-export PATH=$PATH:$ZOOKEEPER_HOME/bin
+if [ "$USER" == "zookeeper" ]; then
+    export PATH=$PATH:$ZOOKEEPER_HOME/bin
+fi
 
 ## HBASE variables
 export HBASE_HOME=/opt/hbase
 export PATH=$PATH:$HBASE_HOME/bin
 
 ## KAFKA variables
-export KAFKA_HOME=/opt/hbase
-export PATH=$PATH:$KAFKA_HOME/bin
-
+export KAFKA_HOME=/opt/kafka
 export KAFKA_HEAP_OPTS="-Xmx256M -Xms128M"
+if [ "$USER" == "kafka" ]; then
+    export PATH=$PATH:$KAFKA_HOME/bin
+fi

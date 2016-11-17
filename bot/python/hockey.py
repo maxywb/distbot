@@ -16,11 +16,13 @@ class HockeyErrorCode(enum.Enum):
     Bad_Season_Format = 1
     Unknown_Command = 2
     No_Format = 3
+    No_Such_Thing = 4
 
 class HockeyError(Exception):
     def __init__(self, code, message):
         super().__init__(message)
         self.code = code
+        self.message = message
 
 class SearchType(enum.Enum):
     Any = ""
@@ -45,6 +47,8 @@ def __get_name_type_and_url(url):
         result_type = SearchType.Player
     elif "teams" in url:
         result_type = SearchType.Franchise
+    else:
+        raise HockeyError(HockeyErrorCode.No_Such_Thing, "no such thing")
 
     if result_type == SearchType.Franchise:
         name = dom.find_class("teams")[0][0][1][0][0]
@@ -422,20 +426,23 @@ def execute_command(query):
     
     terms = query[1:]
 
-    if command == "stats":
-        stats = get_stats(terms, season=season)
-        return __format_stats(stats, season)
-    elif command == "link":
-        results = get_link(terms, 1)
-        return __format_link(results)
-    elif command == "lastgame":
-        played_games, upcoming_games = get_games(terms, season)
-        return __format_last_game(played_games[-1])
-    elif command == "schedule":
-        played_games, upcoming_games = get_games(terms, season)
-        return __format_schedule(upcoming_games[:3])
-    else:
-        raise HockeyError(HockeyErrorCode.Unknown_Command, "unknown command: %s" % command)
+    try:
+        if command == "stats":
+            stats = get_stats(terms, season=season)
+            return __format_stats(stats, season)
+        elif command == "link":
+            results = get_link(terms, 1)
+            return __format_link(results)
+        elif command == "lastgame":
+            played_games, upcoming_games = get_games(terms, season)
+            return __format_last_game(played_games[-1])
+        elif command == "schedule":
+            played_games, upcoming_games = get_games(terms, season)
+            return __format_schedule(upcoming_games[:3])
+    except HockeyError as e:
+        return e.message
+
+    raise HockeyError(HockeyErrorCode.Unknown_Command, "unknown command: %s" % command)
 
 def __test():
     results = search("player", ["boston","bruins"], 1)
@@ -498,7 +505,6 @@ def __test():
         "lastgame seguin",
         "stats horvat",
         "link horvat",
-        "lastgame horvat",
         "stats bo horvat",
         "link bo horvat",
         ]
@@ -508,6 +514,7 @@ def __test():
         "schedule seguin",
         "lastgame bo horvat",
         "schedule bo horvat",
+        "lastgame horvat",
         ]
 
     for tc in test_commands:

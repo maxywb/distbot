@@ -23,10 +23,12 @@ def get_requests_session():
 
     return session
 
-def get_dom_from_url(url, allow_redirects=False):
+def get_dom_from_url(url, allow_redirects=False, auth=None):
     session = get_requests_session()
-    request = session.get(url, allow_redirects=allow_redirects)
-
+    if auth is None:
+        request = session.get(url, allow_redirects=allow_redirects)
+    else:
+        request = session.get(url, allow_redirects=allow_redirects, auth=auth)
     if request.status_code == 302:
         raise RedirectError()
 
