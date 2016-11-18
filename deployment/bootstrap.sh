@@ -75,6 +75,7 @@ timedatectl set-timezone America/New_York
 dnf install -y dnf-plugins-core
 dnf copr enable -y mstuchli/Python3.5
 dnf install -y python35
+dnf install -y python3-lxml.x86_64
 
 # make supergroup
 groupadd supergroup

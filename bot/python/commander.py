@@ -342,6 +342,8 @@ def handle_config(message, pieces):
             text = ", ".join(zk.get_children(real_path))
             if text == "":
                 text = "<none>"
+    elif action == "help":
+        text = "sub-commands: update, delete, get, get-children"
     else:
         text = "unknown action (%s)" % action
 
@@ -352,14 +354,6 @@ def handle_config(message, pieces):
         "destination" : message["destination"],
         "message" : text,
     }
-
-COMMANDS={
-    "help":handle_help,
-    "ping": handle_ping,
-    "weather": handle_weather,
-    "forecast": handle_forecast,
-    "hockey": handle_hockey,
-}
 
 COMMAND_HELP_TEXT={
     "help": "\"help\" - print this text",
