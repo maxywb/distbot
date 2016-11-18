@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import json
 import logging
 import requests
@@ -11,7 +12,7 @@ import kazoo.client as kzc
 import kazoo.recipe.watchers as kzw
 
 import hockey
-import util
+import util.util as util
 import weather
 
 logging.basicConfig()
@@ -361,6 +362,14 @@ COMMAND_HELP_TEXT={
     "weather": "\"weather <search terms>\" - respond with the current weather for the given location",
     "forecast": "\"forecast <search terms>\" - respond with 3 days forcast (including today), normalized to the appropriate timezone",
     "hockey": hockey.HELP_TEXT,
+}
+
+COMMANDS={
+    "help":handle_help,
+    "ping": handle_ping,
+    "weather": handle_weather,
+    "forecast": handle_forecast,
+    "hockey": handle_hockey,
 }
 
 PRIV_COMMANDS={

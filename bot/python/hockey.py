@@ -2,7 +2,7 @@ import datetime
 import enum
 import requests
 
-import util
+import util.web
 
 HELP_TEXT = "\"hockey <command> <search terms>\""
 DETAIL_HELP_TEXT = "stats|link|lastgame|schedule !season=int space separated search terms"
@@ -41,7 +41,7 @@ def get_search_type(name):
         raise ValueError("unknown type %s" % name)
 
 def __get_name_type_and_url(url):
-    dom, url = util.get_dom_from_url(url, allow_redirects=True)
+    dom, url = util.web.get_dom_from_url(url, allow_redirects=True)
 
     if "players" in url:
         result_type = SearchType.Player
@@ -78,8 +78,8 @@ def search(search_type, terms, result_limit):
     }
 
     try:
-        dom = util.get_dom_from_url(url)
-    except util.RedirectError:
+        dom = util.web.get_dom_from_url(url)
+    except util.web.RedirectError:
         # redirect means only a single result
         name, type, url = __get_name_type_and_url(url)
         results[SearchType.Player].append({
@@ -251,7 +251,7 @@ def __get_current_season():
 
 def __get_stats(result_type, result, season):
 
-    dom = util.get_dom_from_url(result["url"])
+    dom = util.web.get_dom_from_url(result["url"])
 
     try:
         stats_table = dom.find_class("table_outer_container")[TABLE_OFFSET[result_type]][0][0][3]
@@ -318,7 +318,7 @@ def get_games(terms, season):
         url = result["url"]
 
 
-    dom = util.get_dom_from_url(url)
+    dom = util.web.get_dom_from_url(url)
 
     games_table = dom.find_class("stats_table")[0][3]
 

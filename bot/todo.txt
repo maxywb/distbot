@@ -1,0 +1,28 @@
+python
+- make command handler class interface so i can have an admin one and a non-admin one so it isn't all mixed up
+
+
+java
+- standby bot
+- set Xmx and Xms to something low on the writer
+- config operations to:
+-- reset kafka connections
+-- reset zk connections
+
+special case modules:
+- bad_command
+- help
+
+modules
+- config
+- forecast
+- hockey
+- ignore
+- ip
+- join
+- part
+- ping
+- privmsg
+- say
+- unignore
+- weather
