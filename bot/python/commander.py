@@ -12,7 +12,7 @@ import kazoo.client as kzc
 import kazoo.recipe.watchers as kzw
 
 import hockey
-import util.util as util
+import util.web
 import weather
 
 logging.basicConfig()
@@ -239,7 +239,7 @@ def handle_privmsg(message, pieces):
     return ret
 
 def handle_ip(message, pieces):
-    dom = util.get_dom_from_url("http://www.networksecuritytoolkit.org/nst/tools/ip.shtml")
+    dom = util.web.get_dom_from_url("http://www.networksecuritytoolkit.org/nst/tools/ip.shtml")
     ip = dom.text.strip()
     return {
         "timestamp" : get_millis(),

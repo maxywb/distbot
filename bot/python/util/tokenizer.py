@@ -12,7 +12,12 @@ def find_string_end(query):
 
     return " ".join(pieces), query
 
-def tokenize(query):
+def tokenize(input):
+    if isinstance(input, list):
+        query = input
+    else:
+        query = input.split()
+
     while "=" in query:
         equals = query.index("=")
         start = equals - 1

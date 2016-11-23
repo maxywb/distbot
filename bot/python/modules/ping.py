@@ -20,5 +20,9 @@ class Ping():
             if event is None or event.type == "CHANGED":
                 self.response = data.decode("utf-8")
         
+    def accepts(self, message):
+        return 
+
     def consume(self, message):
         return "%s: %s" % (message["nick"], self.response)
+    
