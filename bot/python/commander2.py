@@ -16,11 +16,11 @@ import util.tokenizer
 import util.zk
 
 class Commander():
-    def __init__(self, zk_client, zk_tree="/bot", worker_count=2):
+    def __init__(self, zk_client, configuration, zk_tree="/bot", worker_count=2):
         self.zk_client = zk_client
         self.zk_tree = zk_tree
 
-        self.configuration = util.configuration.Configuration(self.zk_client, self.zk_tree)
+        self.configuration = configuration
 
         def get_path(path):
             return os.path.join(self.zk_tree, path)
@@ -62,15 +62,36 @@ class Commander():
         self.handler_lock = threading.Lock()
         self.handlers = {}
         self.subcommands = {}
+        self.loaded_modules = set()
+
+        modules_path = get_path("modules/enabled")
+
+        @kzw.ChildrenWatch(self.zk_client, modules_path)
+        def modules_watcher(nodes):
+            cannon_modules = set(nodes)
+            new_modules = cannon_modules - self.loaded_modules
+            del_modules = self.loaded_modules - cannon_modules
+
+            self.log.debug("adding modules: %s", new_modules)
+            self.log.debug("removing modules: %s", del_modules)
+
+            for mod in del_modules:
+                self._unload_module(mod)
+
+            for mod in new_modules:
+                self._load_module(mod)
+
+            assert self.loaded_modules == cannon_modules
 
     def _unload_module(self, module_name):
         with self.handler_lock:
             subcommand = self.handlers[module_name]
             del self.handlers[module_name]
             del self.subcommands[subcommand]
+            self.loaded_modules.remove(module_name)
 
-    def _load_module(self, module_name):
-        module_name = "modules." + module_name
+    def _load_module(self, base_module_name):
+        module_name = "modules." + base_module_name
 
         try:
             module = importlib.import_module(module_name)
@@ -89,6 +110,7 @@ class Commander():
         with self.handler_lock:
             self.handlers[module_name] = subcommand
             self.subcommands[subcommand] = handler
+            self.loaded_modules.add(base_module_name)
 
     def _handle_message(self, message):
         
@@ -150,9 +172,10 @@ class Commander():
 
             message["raw_message"] = message["message"].split()
             message["message"] = util.tokenizer.tokenize(message["message"])
-
-            self._handle_message(message)
-
+            try:
+                self._handle_message(message)
+            except:
+                self.log.exception()
 
 if __name__ == "__main__":
     import kazoo.client as kzc
@@ -160,8 +183,7 @@ if __name__ == "__main__":
     zk_client = kzc.KazooClient(hosts="192.168.1.201:2181")
     zk_client.start()
 
-    c = Commander(zk_client)
-
-    c._load_module("ping")
+    configuration = util.configuration.Configuration(zk_client, "/bot")
+    c = Commander(zk_client, configuration)
 
     c.run()
