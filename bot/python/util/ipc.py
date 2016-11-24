@@ -27,7 +27,7 @@ class Producer():
         self.topic = topic
 
     def send(self, message):
-        self.producer.send(self.topic, bytes(message, "utf-8"))        
+        self.producer.send(self.topic, bytes(message.wire_repr(), "utf-8"))        
 
 if __name__ == "__main__":
     import sys, time, json

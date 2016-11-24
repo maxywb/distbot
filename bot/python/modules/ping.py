@@ -2,27 +2,27 @@ import os
 
 import kazoo.recipe.watchers as kzw
 
-import util.zk
+import util.message 
 
 MODULE_CLASS_NAME="Ping"
+
+MODULE_SUBCOMMAND="ping"
 
 class Ping():
     HELP_TEXT = "ping - repond with <nick>: <response>"
 
-    def __init__(self, zk_client, zk_tree):
-        self.zk_client = zk_client
+    def __init__(self, configuration, **kwargs):
 
-        response_path = os.path.join(zk_tree, "modules/config/ping/response")
-        self.response = util.zk.get_data(self.zk_client, response_path)
+        self.configuration = configuration
 
-        @kzw.DataWatch(zk_client, response_path)
-        def my_name_watcher(data, stat, event):
-            if event is None or event.type == "CHANGED":
-                self.response = data.decode("utf-8")
+        self.configuration.watch_for_data("ping_response", "modules/config/ping/response")
         
-    def accepts(self, message):
-        return 
-
     def consume(self, message):
-        return "%s: %s" % (message["nick"], self.response)
+
+        who = message["nick"]
+        where = message["destination"]
+        response = "%s: %s" % (message["nick"], self.configuration.ping_response)
+
+        return util.message.Message(who, where, response)
+
     

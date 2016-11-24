@@ -5,17 +5,22 @@ import json
 import logging
 import os
 import threading
+import traceback
 
 import kazoo.recipe.watchers as kzw
 
+import util.configuration
 import util.ipc
-import util.zk
+import util.message
 import util.tokenizer
+import util.zk
 
 class Commander():
     def __init__(self, zk_client, zk_tree="/bot", worker_count=2):
         self.zk_client = zk_client
         self.zk_tree = zk_tree
+
+        self.configuration = util.configuration.Configuration(self.zk_client, self.zk_tree)
 
         def get_path(path):
             return os.path.join(self.zk_tree, path)
@@ -23,7 +28,7 @@ class Commander():
         # setup logger
         logging.basicConfig()
         self.log = logging.getLogger(self.__class__.__name__)
-        self.log.setLevel(logging.DEBUG)
+        self.log.setLevel(logging.INFO)
         
         # setup kafka
         kafka_name_path = get_path("config/commander/name")
@@ -55,13 +60,14 @@ class Commander():
         
         # modules
         self.handler_lock = threading.Lock()
-        self.loaded_modules = set()
         self.handlers = {}
+        self.subcommands = {}
 
     def _unload_module(self, module_name):
         with self.handler_lock:
+            subcommand = self.handlers[module_name]
             del self.handlers[module_name]
-            self.loaded_modules.discard(module_name)
+            del self.subcommands[subcommand]
 
     def _load_module(self, module_name):
         module_name = "modules." + module_name
@@ -69,44 +75,67 @@ class Commander():
         try:
             module = importlib.import_module(module_name)
             module_class = getattr(module, module.MODULE_CLASS_NAME)
-            handler = module_class(self.zk_client, self.zk_tree)
+            subcommand = module.MODULE_SUBCOMMAND
+            handler = module_class(configuration=self.configuration,
+                                   zk_client=self.zk_client)
+            
         except (ImportError, AttributeError) as e:
-            self.log.error(e)
+            self.log.exception("something wrong with the module")
             return
         except:
             self.log.exception("something went wrong while loading %s" % module_name)
             return
 
         with self.handler_lock:
-            self.handlers[module_name] = handler
-            self.loaded_modules.add(module_name)
+            self.handlers[module_name] = subcommand
+            self.subcommands[subcommand] = handler
 
     def _handle_message(self, message):
-        results = list()
+        
+        args = message["message"].args
+        command = message["message"].command
+
+        if len(command) <= 0:
+            return
+
+        talking_to_me = (command[0] == self.my_name) \
+                        or (command[0] == (self.my_name + ":")) 
+        if talking_to_me:
+            del command[0]
+        else:
+            if message["destination"] != "PRIVMSG":
+                return
+
+        subcommand = command[0]
+        who = message["nick"]
+        where = message["destination"]
 
         with self.handler_lock:
-            for _, handler in self.handlers.items():
-                if handler.accepts(message)
-                result = handler.consume(message)
-                if result is not None:
-                    results.append(result)
-        
-        if len(results) >= 1:
-            if len(results) >= 2:
-                log.error("more than one respondent to %s" % raw_message)
-            self._respond(results[0])
-            
+            handler = self.subcommands.get(subcommand, None)
+            if handler is None:
+                response = util.message.Message(who,
+                                                where,
+                                                "%s: no such command: %s" % (who, subcommand))
+            else:
+                response = handler.consume(message)
+
+        self._respond(response)
 
     def _respond(self, response):
-        print(response)
-
+        if isinstance(response, list):
+            for message in response:
+                self.producer.send(message)
+        else:
+            self.producer.send(response)
+                
     def run(self):
         for raw_message in self.consumer:
 
             message = json.loads(raw_message.value.decode("utf-8"))
-            topic = msg.key.decode("utf-8")
-            talking_to_me = message["message"].startswith(self.my_name) or (destination in ["on-privmsg", "on-dcc"])
-
+            key = raw_message.key.decode("utf-8")
+            if key != "on-msg":
+                continue
+            self.log.debug(raw_message)
             message["raw_message"] = message["message"].split()
             message["message"] = util.tokenizer.tokenize(message["message"])
 

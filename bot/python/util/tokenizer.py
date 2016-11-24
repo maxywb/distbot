@@ -1,3 +1,6 @@
+from collections import namedtuple
+
+Command= namedtuple("Command", ["args","command"])
 
 def find_string_end(query):
     i = 0
@@ -54,4 +57,4 @@ def tokenize(input):
                 
         i += 1
 
-    return args, query
+    return Command(args, query)
