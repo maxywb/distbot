@@ -113,9 +113,17 @@ class Commander():
         with self.handler_lock:
             handler = self.subcommands.get(subcommand, None)
             if handler is None:
+                if subcommand == "help":
+                    text = list()
+                    for _, handler in self.subcommands.items():
+                        text.append(handler.HELP_TEXT)
+                    response_text = "; ".join(text)
+                else:
+                    response_text = "%s: no such command: %s" % (who, subcommand)
+
                 response = util.message.Message(who,
                                                 where,
-                                                "%s: no such command: %s" % (who, subcommand))
+                                                response_text)
             else:
                 response = handler.consume(message)
 
@@ -133,9 +141,13 @@ class Commander():
 
             message = json.loads(raw_message.value.decode("utf-8"))
             key = raw_message.key.decode("utf-8")
-            if key != "on-msg":
+
+            if key not in  ["on-msg", "on-privmsg"]:
+                self.log.debug("unhandled: %s", raw_message)
                 continue
+
             self.log.debug(raw_message)
+
             message["raw_message"] = message["message"].split()
             message["message"] = util.tokenizer.tokenize(message["message"])
 

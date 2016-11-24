@@ -9,10 +9,6 @@ java
 -- reset kafka connections
 -- reset zk connections
 
-special case modules:
-- bad_command
-- help
-
 modules
 - config
 - forecast

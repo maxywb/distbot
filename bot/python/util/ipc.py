@@ -1,3 +1,4 @@
+import logging
 import kafka
 
 class Consumer():
@@ -26,8 +27,13 @@ class Producer():
         self.producer = kafka.KafkaProducer(bootstrap_servers=server)
         self.topic = topic
 
+        self.log = logging.getLogger(self.__class__.__name__)
+        self.log.setLevel(logging.INFO)
+
     def send(self, message):
-        self.producer.send(self.topic, bytes(message.wire_repr(), "utf-8"))        
+        text = message.wire_repr()
+        self.log.info("sending: %s" % text)
+        self.producer.send(self.topic, bytes(text, "utf-8"))        
 
 if __name__ == "__main__":
     import sys, time, json
