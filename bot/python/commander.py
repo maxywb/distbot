@@ -51,6 +51,22 @@ def watcher(data, stat, event):
     if event is None or event.type == "CHANGED":
         my_name = data.decode("utf-8")
 
+def get_user(zk, nick):
+    path = "/bot/users/%s" % nick
+    if zk.exists(path) is None:
+        return None
+
+    locations = dict()
+    # build up locations
+    locations_path = "%s/%s" % (path, "locations")
+    for location in zk.get_children(locations_path):
+        specific_path = "%s/%s" % (locations_path, location)
+        value = zk.get(specific_path)[0].decode("utf-8")
+        locations[location] = value
+
+    return {
+        "locations" : locations,
+        }
 
 keys = {
     "google" : zk.get("/bot/config/key/google")[0].decode("utf-8"),

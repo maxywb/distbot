@@ -53,8 +53,7 @@ class Commander():
                                           configuration=self.configuration)
 
         # bad users
-        bad_user_path = get_path("config/ignore")
-        self.bad_users = util.zk.ChildrenSet(self.zk_client, bad_user_path)
+        self.configuration.watch_for_children("bad_users", get_path("config/ignore"))
         
         # my name
         my_name_path = get_path("config/name")
@@ -142,7 +141,7 @@ class Commander():
         args = message["message"].args
         pieces = message["message"].command
 
-        if len(pieces) <= 0:
+        if len(pieces) <= 0 or self.configuration.bad_users.contains(message["nick"]):
             return
 
         talking_to_me = (pieces[0] == self.my_name) \
@@ -173,6 +172,11 @@ class Commander():
                                                 response_text)
             else:
                 response = handler.consume(message)
+
+        if response is None:
+            response = util.message.Message(who,
+                                            where,
+                                            "done")
 
         self._respond(response)
 
