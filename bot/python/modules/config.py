@@ -8,8 +8,6 @@ MODULE_CLASS_NAME="Config"
 MODULE_SUBCOMMAND="config"
 
 class Config():
-    HELP_TEXT = ""
-
     def __init__(self, configuration, zk_client, **kwargs):
         self.configuration = configuration
         self.zk_client = zk_client

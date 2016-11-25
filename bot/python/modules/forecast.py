@@ -7,7 +7,7 @@ MODULE_SUBCOMMAND="forecast"
 
 
 class Forecast():
-    HELP_TEXT =  "forecast <search terms> - respond with 3 days forcast (including today), normalized to the appropriate timezone",
+    HELP_TEXT =  "forecast <search terms> - respond with 3 days forcast (including today), normalized to the appropriate timezone"
 
     def __init__(self, configuration, zk_client, **kwargs):
 

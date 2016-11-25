@@ -6,8 +6,6 @@ MODULE_CLASS_NAME="Unignore"
 MODULE_SUBCOMMAND="unignore"
 
 class Unignore():
-    HELP_TEXT = ""
-
     def __init__(self, configuration, zk_client, **kwargs):
         self.configuration = configuration
         self.zk_client = zk_client

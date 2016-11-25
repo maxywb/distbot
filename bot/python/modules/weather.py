@@ -7,7 +7,7 @@ MODULE_CLASS_NAME="Weather"
 MODULE_SUBCOMMAND="weather"
 
 class Weather():
-    HELP_TEXT = "weather <search terms> - respond with the current weather for the given location",
+    HELP_TEXT = "weather <search terms> - respond with the current weather for the given location"
 
     def __init__(self, configuration, zk_client, **kwargs):
 

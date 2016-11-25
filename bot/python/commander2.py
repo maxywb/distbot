@@ -162,8 +162,11 @@ class Commander():
                 if subcommand == "help":
                     text = list()
                     for _, handler in self.subcommands.items():
-                        text.append(handler.HELP_TEXT)
-                    response_text = "; ".join(text)
+                        help_text = getattr(handler, "HELP_TEXT", None)
+                        if help_text is not None:
+                            text.append(help_text)
+
+                        response_text = "; ".join(text)
                 else:
                     response_text = "%s: no such command: %s" % (who, subcommand)
 

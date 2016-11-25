@@ -7,8 +7,6 @@ MODULE_CLASS_NAME="Ip"
 MODULE_SUBCOMMAND="ip"
 
 class Ip():
-    HELP_TEXT = ""
-
     def __init__(self, configuration, zk_client, **kwargs):
         self.configuration = configuration
         self.zk_client = zk_client

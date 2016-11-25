@@ -6,8 +6,6 @@ MODULE_CLASS_NAME="Part"
 MODULE_SUBCOMMAND="part"
 
 class Part():
-    HELP_TEXT = ""
-
     def __init__(self, configuration, zk_client, **kwargs):
         self.configuration = configuration
         self.zk_client = zk_client

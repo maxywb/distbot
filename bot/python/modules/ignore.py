@@ -6,8 +6,6 @@ MODULE_CLASS_NAME="Ignore"
 MODULE_SUBCOMMAND="ignore"
 
 class Ignore():
-    HELP_TEXT = ""
-
     def __init__(self, configuration, zk_client, **kwargs):
         self.configuration = configuration
         self.zk_client = zk_client
