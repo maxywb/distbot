@@ -37,6 +37,10 @@ def tokenize(input):
             key = parts[0][1:]
             value = "=".join(parts[1:])
             
+            if len(value) <= 0:
+                i += 1
+                continue
+
             if value[0] == "\"":
                 remainder, new_query = find_string_end(query[i+1:])
                 value += " " + remainder
