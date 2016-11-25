@@ -1,24 +1,24 @@
 python
-
-
+- commands
+-- spark
+-- reset kafka connection
 
 java
 - standby bot
-- set Xmx and Xms to something low on the writer
 - config operations to:
 -- reset kafka connections
 -- reset zk connections
 
-modules
-- config
-- forecast
-- hockey
-- ignore
-- ip
-- join
-- part
-- ping
-- privmsg
-- say
-- unignore
-- weather
+
+
+
+
+
+
+
+
+
+
+
+
+
