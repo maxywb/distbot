@@ -11,7 +11,6 @@ import sys
 
 import kazoo.recipe.watchers as kzw
 
-import util.configuration
 import util.ipc
 import util.message
 import util.tokenizer
@@ -78,13 +77,12 @@ class Commander():
             new_modules = cannon_modules - self.loaded_modules
             del_modules = self.loaded_modules - cannon_modules
 
-            self.log.debug("adding modules: %s", new_modules)
-            self.log.debug("removing modules: %s", del_modules)
-
             for mod in del_modules:
+                self.log.debug("unload %s", mod)
                 self._unload_module(mod)
 
             for mod in new_modules:
+                self.log.debug("load %s", mod)
                 self._load_module(mod)
 
             assert self.loaded_modules == cannon_modules
@@ -96,7 +94,6 @@ class Commander():
             subcommand = self.handlers[module_name]
             del self.handlers[module_name]
             del self.subcommands[subcommand]
-
 
     def _load_module(self, base_module_name):
         importlib.invalidate_caches()
@@ -211,6 +208,8 @@ class Commander():
 
 if __name__ == "__main__":
     import kazoo.client as kzc
+
+    import util.configuration
 
     zk_client = kzc.KazooClient(hosts="192.168.1.201:2181")
     zk_client.start()
