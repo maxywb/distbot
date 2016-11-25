@@ -6,6 +6,23 @@ import kazoo.recipe.watchers
 def get_data(zk, path):
     return zk.get(path)[0].decode("utf-8")
 
+def get_user(zk, nick):
+    path = "/bot/users/%s" % nick
+    if zk.exists(path) is None:
+        return None
+
+    locations = dict()
+    # build up locations
+    locations_path = "%s/%s" % (path, "locations")
+    for location in zk.get_children(locations_path):
+        specific_path = "%s/%s" % (locations_path, location)
+        value = zk.get(specific_path)[0].decode("utf-8")
+        locations[location] = value
+
+    return {
+        "locations" : locations,
+        }
+
 class ChildrenSet():
     def __init__(self, zk_client, path, *args, **kwargs):
         self.zk_client = zk_client

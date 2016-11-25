@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
 import importlib
+import importlib.util
 import json
 import logging
 import os
 import threading
 import traceback
+import sys
 
 import kazoo.recipe.watchers as kzw
 
@@ -96,8 +98,9 @@ class Commander():
             self.loaded_modules.remove(module_name)
 
     def _load_module(self, base_module_name):
+        importlib.invalidate_caches()
         module_name = "modules." + base_module_name
-
+        
         try:
             module = importlib.import_module(module_name)
             module_class = getattr(module, module.MODULE_CLASS_NAME)
@@ -116,6 +119,15 @@ class Commander():
             self.handlers[module_name] = subcommand
             self.subcommands[subcommand] = handler
             self.loaded_modules.add(base_module_name)
+
+        # reload util modules
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+
+        util_path = os.path.join(dir_path, "util")
+        for _, module in sys.modules.items():
+            filename = getattr(module, "__file__", "")
+            if filename.startswith(util_path):
+                importlib.reload(module)
 
     def _handle_message(self, message):
         

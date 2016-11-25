@@ -1,13 +1,13 @@
 import util.message 
 import util.weather
-import util.zk
 
-MODULE_CLASS_NAME="Weather"
+MODULE_CLASS_NAME="Forecast"
 
-MODULE_SUBCOMMAND="weather"
+MODULE_SUBCOMMAND="forecast"
 
-class Weather():
-    HELP_TEXT = "weather <search terms> - respond with the current weather for the given location",
+
+class Forecast():
+    HELP_TEXT =  "forecast <search terms> - respond with 3 days forcast (including today), normalized to the appropriate timezone",
 
     def __init__(self, configuration, zk_client, **kwargs):
 
@@ -40,6 +40,6 @@ class Weather():
         else:
             query = pieces[1:]
 
-        text = util.weather.get_weather(self.configuration.weather_key, self.configuration.location_key, query)
+        text = util.weather.get_forecast(self.configuration.weather_key, self.configuration.location_key, query)
     
         return util.message.Message(who, where, text)
