@@ -1,5 +1,3 @@
-import os
-
 import kazoo.recipe.watchers as kzw
 
 import util.message 

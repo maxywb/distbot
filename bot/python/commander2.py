@@ -26,9 +26,8 @@ class Commander():
             return os.path.join(self.zk_tree, path)
 
         # setup logger
-        logging.basicConfig()
         self.log = logging.getLogger(self.__class__.__name__)
-        self.log.setLevel(logging.INFO)
+        self.log.setLevel(self.configuration.log_level)
         
         # setup kafka
         kafka_name_path = get_path("config/commander/name")
@@ -36,23 +35,29 @@ class Commander():
         kafka_server_path = get_path("config/kafka")
         kafka_server_string = util.zk.get_data(zk_client, kafka_server_path)
         
+        # consumer (read from wire)
         commander_consumer_topic_path = get_path("config/commander/consumer")
         commander_consumer_topic = util.zk.get_data(self.zk_client, commander_consumer_topic_path)
         self.consumer = util.ipc.Consumer(server=kafka_server_string,
                                           name=kafka_name,
-                                          topic=commander_consumer_topic)
+                                          topic=commander_consumer_topic,
+                                          configuration=self.configuration)
 
+        # consumer (write to wire)
         commander_producer_topic_path = get_path("config/commander/producer")
         commander_producer_topic = util.zk.get_data(self.zk_client, commander_producer_topic_path)
         self.producer = util.ipc.Producer(server=kafka_server_string,
-                                          topic=commander_producer_topic)
+                                          topic=commander_producer_topic,
+                                          configuration=self.configuration)
 
-        # zk related setup
+        # bad users
         bad_user_path = get_path("config/ignore")
         self.bad_users = util.zk.ChildrenSet(self.zk_client, bad_user_path)
         
+        # my name
         my_name_path = get_path("config/name")
         self.my_name = util.zk.get_data(self.zk_client, my_name_path)
+
         @kzw.DataWatch(zk_client, my_name_path)
         def my_name_watcher(data, stat, event):
             if event is None or event.type == "CHANGED":
@@ -115,20 +120,20 @@ class Commander():
     def _handle_message(self, message):
         
         args = message["message"].args
-        command = message["message"].command
+        pieces = message["message"].command
 
-        if len(command) <= 0:
+        if len(pieces) <= 0:
             return
 
-        talking_to_me = (command[0] == self.my_name) \
-                        or (command[0] == (self.my_name + ":")) 
+        talking_to_me = (pieces[0] == self.my_name) \
+                        or (pieces[0] == (self.my_name + ":")) 
         if talking_to_me:
-            del command[0]
+            del pieces[0]
         else:
             if message["destination"] != "PRIVMSG":
                 return
 
-        subcommand = command[0]
+        subcommand = pieces[0]
         who = message["nick"]
         where = message["destination"]
 
@@ -160,22 +165,22 @@ class Commander():
                 
     def run(self):
         for raw_message in self.consumer:
-
-            message = json.loads(raw_message.value.decode("utf-8"))
-            key = raw_message.key.decode("utf-8")
-
-            if key not in  ["on-msg", "on-privmsg"]:
-                self.log.debug("unhandled: %s", raw_message)
-                continue
-
-            self.log.debug(raw_message)
-
-            message["raw_message"] = message["message"].split()
-            message["message"] = util.tokenizer.tokenize(message["message"])
             try:
+                message = json.loads(raw_message.value.decode("utf-8"))
+                key = raw_message.key.decode("utf-8")
+
+                if key not in  ["on-msg", "on-privmsg"]:
+                    self.log.debug("unhandled: %s", raw_message)
+                    continue
+
+                self.log.debug(raw_message)
+
+                message["raw_message"] = message["message"].split()
+                message["message"] = util.tokenizer.tokenize(message["message"])
+
                 self._handle_message(message)
             except:
-                self.log.exception()
+                self.log.exception("something happend with the message")
 
 if __name__ == "__main__":
     import kazoo.client as kzc

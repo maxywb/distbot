@@ -2,13 +2,15 @@ import logging
 import kafka
 
 class Consumer():
-    def __init__(self, server, name, topic):
+    def __init__(self, server, name, topic, configuration):
         self.consumer = kafka.KafkaConsumer(bootstrap_servers=server,
                                             group_id=name,
                                             enable_auto_commit=True,
                                             auto_commit_interval_ms=1000,
                                             session_timeout_ms=30000
         )
+
+        self.configuration = configuration
 
         # take control of the partitions and don't handle queued messages
         # sort of stupuid to do, but since there's only one commander...
@@ -23,13 +25,15 @@ class Consumer():
             yield message
 
 class Producer():
-    def __init__(self, server, topic):
+    def __init__(self, server, topic, configuration):
         self.producer = kafka.KafkaProducer(bootstrap_servers=server)
         self.topic = topic
+        
+        self.configuration = configuration
 
         self.log = logging.getLogger(self.__class__.__name__)
-        self.log.setLevel(logging.INFO)
-
+        self.log.setLevel(self.configuration.log_level)
+        
     def send(self, message):
         text = message.wire_repr()
         self.log.info("sending: %s" % text)

@@ -21,10 +21,9 @@ def get_location_description(location):
 
     return ", ".join(description)
 
-def get_location_details(keys, query_location):
+def get_location_details(key, query_location):
     # get utc_offset for location 
-
-    base_tz_url = "https://maps.googleapis.com/maps/api/geocode/json?key=%s" % keys["google"]
+    base_tz_url = "https://maps.googleapis.com/maps/api/geocode/json?key=%s" % key
 
     query_location = "+".join(query_location)
 
@@ -40,7 +39,7 @@ def get_location_details(keys, query_location):
     lng = results["lng"]
 
     timestamp=int(time.time())
-    tz_url = "https://maps.googleapis.com/maps/api/timezone/json?key=%s&location=%s,%s&timestamp=%d" % (keys["google"], lat, lng, timestamp)
+    tz_url = "https://maps.googleapis.com/maps/api/timezone/json?key=%s&location=%s,%s&timestamp=%d" % (key, lat, lng, timestamp)
 
     raw_timezone = requests.get(tz_url).json()
 
@@ -49,11 +48,3 @@ def get_location_details(keys, query_location):
     utc_delta = datetime.timedelta(seconds=utc_offset)
 
     return location, lat, lng, utc_delta
-
-
-keys = {
-    "google":"AIzaSyDDuBpbBWXAfQELUto83BchIPONBgvf1ao",
-    "weather": "e81fbe4eb94b7a5511e9e76b5dab64ec",
-}
-
-

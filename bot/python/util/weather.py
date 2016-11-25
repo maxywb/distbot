@@ -1,13 +1,13 @@
 import datetime
 import requests
 
-import location
+import util.location
 
-def get_weather(keys, query_location):
-    location_name, lat, lng, _ = location.get_location_details(keys, query_location)
+def get_weather(weather_key, location_key, query_location):
+    location_name, lat, lng, _ = util.location.get_location_details(location_key, query_location)
 
     # 
-    r = requests.get("http://api.openweathermap.org/data/2.5/weather?lat=%s&lon=%s&appid=%s&units=imperial" % (lat, lng, keys["weather"]))
+    r = requests.get("http://api.openweathermap.org/data/2.5/weather?lat=%s&lon=%s&appid=%s&units=imperial" % (lat, lng, weather_key))
 
     temp = r.json()["main"]["temp"]
 
@@ -16,8 +16,8 @@ def get_weather(keys, query_location):
     message = "%s -  %s, %sf" % (location_name, description, temp)
     return message
 
-def get_forecast(keys, query_location):
-    location_name, lat, lng, utc_delta = location.get_location_details(keys, query_location)
+def get_forecast(weather_key, location_key, query_location):
+    location_name, lat, lng, utc_delta = util.location.get_location_details(location_key, query_location)
 
     # get forecast, normalize times to local timezone
 
@@ -27,7 +27,7 @@ def get_forecast(keys, query_location):
 
     # get forecast
     count = 3
-    r = requests.get("http://api.openweathermap.org/data/2.5/forecast/daily?cnt=%d&lat=%s&lon=%s&appid=%s&units=imperial" % (count, lat, lng, keys["weather"]))
+    r = requests.get("http://api.openweathermap.org/data/2.5/forecast/daily?cnt=%d&lat=%s&lon=%s&appid=%s&units=imperial" % (count, lat, lng, weather_key))
 
     raw = r.json()["list"]
 
