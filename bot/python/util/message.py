@@ -30,6 +30,19 @@ class Message():
         self.timestamp = _get_millis()
         return BASE_MESSAGE % self
 
+class Command():
+    def __init__(self, action, location, message=""):
+        self.message_type = action
+        self.destination = location
+        self.message = message
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    def wire_repr(self):
+        self.timestamp = _get_millis()
+        return BASE_MESSAGE % self
+
 if __name__ == "__main__":
     m = Message("user", "channel", "message")
     print(m.wire_repr())
