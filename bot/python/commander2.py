@@ -90,19 +90,27 @@ class Commander():
 
             assert self.loaded_modules == cannon_modules
 
-    def _unload_module(self, module_name):
+    def _unload_module(self, base_module_name):
+        module_name = "modules." + base_module_name
         with self.handler_lock:
+            self.loaded_modules.remove(base_module_name)
             subcommand = self.handlers[module_name]
             del self.handlers[module_name]
             del self.subcommands[subcommand]
-            self.loaded_modules.remove(module_name)
+
 
     def _load_module(self, base_module_name):
         importlib.invalidate_caches()
         module_name = "modules." + base_module_name
         
         try:
-            module = importlib.import_module(module_name)
+            # check if it's been reloaded
+            if module_name in sys.modules:
+                module = sys.modules[module_name]
+                importlib.reload(module)            
+            else:
+                module = importlib.import_module(module_name)
+
             module_class = getattr(module, module.MODULE_CLASS_NAME)
             subcommand = module.MODULE_SUBCOMMAND
             handler = module_class(configuration=self.configuration,

@@ -4,7 +4,6 @@ import requests
 
 import util.web
 
-HELP_TEXT = "\"hockey <command> <search terms>\""
 DETAIL_HELP_TEXT = "stats|link|lastgame|schedule !season=int space separated search terms"
 
 SEARCH_BASE_URL = "http://www.hockey-reference.com/search/search.fcgi?search="
@@ -392,37 +391,16 @@ def __format_schedule(games):
     
     return prefix + ", ".join([schedule_format % game for game in games])
 
-def execute_command(query):
-    season = __get_current_season()
-
-    if "=" in query:
-        equals = query.index("=")
-        start = equals - 1
-        end = equals + 1
-        
-        query[start] = "%s=%s" % (query[start], query[end])
-        del query[equals:end+1]
-
-    i = 0
-    while i < len(query):
-        if query[i].startswith("!season"):
-            raw_text = query[i].split("=")[-1]
-            try:
-                season = int(raw_text)
-            except ValueError:
-                raise HockeyError(HockeyErrorCode.Bad_Season_Format, "invalid season: %s" % raw_text)
-
-            del query[i]
-            continue
-
-        i += 1
+def execute_command(args, query):
+    raw_season = args.get("season", __get_current_season())
+    try:
+        season = int(raw_season)
+    except ValueError:
+        raise HockeyError(HockeyErrorCode.Bad_Season_Format, "invalid season: %s" % raw_season)
 
     command = query[0].lower()
-    if command == "help":
+    if command == "help" or len(query) < 2:
         return DETAIL_HELP_TEXT
-
-    if len(query) < 2:
-        raise HockeyError(HockeyErrorCode.No_Search_Terms, "must provide search terms")
     
     terms = query[1:]
 
