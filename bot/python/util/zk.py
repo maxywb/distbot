@@ -6,8 +6,8 @@ import kazoo.recipe.watchers
 def get_data(zk, path):
     return zk.get(path)[0].decode("utf-8")
 
-def get_user(zk, nick):
-    path = "/bot/users/%s" % nick
+def get_user(zk, zk_root, nick):
+    path = "%s/users/%s" % (zk_root, nick)
     if zk.exists(path) is None:
         return None
 
@@ -22,6 +22,20 @@ def get_user(zk, nick):
     return {
         "locations" : locations,
         }
+
+def get_child_data(zk, zk_root, path):
+    path = os.path.join(zk_root, path)
+    if zk.exists(path) is None:
+        return None
+
+    child_data = list()
+
+    for child_name in zk.get_children(path):
+        specific_path = os.path.join(path, child_name)
+        value = zk.get(specific_path)[0].decode("utf-8")
+        child_data.append(value)
+
+    return child_data
 
 class ChildrenSet():
     def __init__(self, zk_client, path, *args, **kwargs):

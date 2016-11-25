@@ -22,7 +22,7 @@ class Weather():
         who = message["nick"]
         where = message["destination"]
 
-        user = util.zk.get_user(self.zk_client, message["nick"])
+        user = util.zk.get_user(self.zk_client, self.configuration.config_root, message["nick"])
 
         pieces = message["message"].command
 

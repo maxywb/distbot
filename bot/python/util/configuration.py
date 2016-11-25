@@ -51,6 +51,7 @@ class Configuration():
             real_path = os.path.join(self.config_root, path)
             setattr(self, tag, util.zk.ChildrenSet(self.zk_client, real_path))
 
+
 if __name__ == "__main__":
     import kazoo.client as kzc
     zk_client = kzc.KazooClient(hosts="192.168.1.201:2181")
