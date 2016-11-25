@@ -1,11 +1,12 @@
 import util.admin
 import util.message 
+import util.web
 
-MODULE_CLASS_NAME="Privmsg"
+MODULE_CLASS_NAME="Ip"
 
-MODULE_SUBCOMMAND="privmsg"
+MODULE_SUBCOMMAND="ip"
 
-class Privmsg():
+class Ip():
     HELP_TEXT = ""
 
     def __init__(self, configuration, zk_client, **kwargs):
@@ -16,10 +17,10 @@ class Privmsg():
         if not util.admin.is_admin(self.zk_client, self.configuration, message):
             return util.admin.admonish(self.zk_client, self.configuration, message)
 
-        pieces = message["message"].command
-        who = pieces[1]
+        who = message["nick"]
         where = "PRIVMSG"
-        text = " ".join(pieces[2:])
+        dom = util.web.get_dom_from_url("http://www.networksecuritytoolkit.org/nst/tools/ip.shtml")
+        ip = dom.text.strip()
 
-        return util.message.Message(who, where, text)
+        return util.message.Message(who, where, "my ip is: %s" % ip)
 
