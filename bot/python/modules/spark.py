@@ -4,10 +4,12 @@ import datetime
 import json
 import time
 import urllib
+import contextlib
 
 import pyspark
 
-import util
+import util.message
+import util.web
 
 FORMAT_STRING = "%(datetime)s - %(nick)s -> %(destination)s : %(message)s"
 
@@ -16,11 +18,7 @@ def get_timestamp(time):
     dt = datetime.datetime.fromtimestamp(time)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
-def get_messages():
-    sc = pyspark.SparkContext("spark://192.168.1.201:7077", "bot")
-    sc.addPyFile("/home/meatwad/prog/src/distbot/bot/python/spark.py")
-    sc.addPyFile("/home/meatwad/prog/src/distbot/bot/python/util.py")
-
+def get_messages(sc):
     text = sc.textFile("hdfs://192.168.1.201:9000/bot/logs/irc-publish/on-msg")
     def loader(line):
         try:
@@ -65,7 +63,7 @@ def make_paste(messages):
     
     url = "https://api.teknik.io/v1/Paste"
 
-    session = util.get_requests_session()
+    session = util.web.get_requests_session()
 
     result = session.post(url, headers=headers, data=payload).json()
 
@@ -86,8 +84,8 @@ CONVINIENCE_MAPPING = {
     ],
 }
 
-def do_search(args, message_limit):
-    messages = get_messages()
+def do_search(sc, args, message_limit):
+    messages = get_messages(sc)
 
     for index, terms in args.items():
         messages = messages.filter(search(index, terms))
@@ -103,41 +101,60 @@ def do_search(args, message_limit):
 
     return text
 
-def execute_command(query, message_limit=5):
-    sub_command = query[1]
-    args, query = util.tokenize(query[2:])
 
-    # setup convinience mappings
-    for real_name, nice_names in CONVINIENCE_MAPPING.items():
-        for nice_name in nice_names:
-            if nice_name in args:
-                if real_name not in args:
-                    args[real_name] = args[nice_name]
-                del args[nice_name]
+@contextlib.contextmanager
+def spark_context(spark_master, app_name, executor_memory="500m"):
+    conf = pyspark.SparkConf().setMaster(spark_master) \
+                      .setAppName(app_name) \
+                      .set("spark.executor.memory", executor_memory)
+    spark_context = pyspark.SparkContext(conf=conf)
 
-    # ensure channel # prefix
-    if "destination" in args and args["destination"][0] != "#":
-        args["destination"] = "#" + args["destination"]
+    spark_context.addPyFile("/home/meatwad/prog/src/distbot/bot/python/modules/spark.py")
+    spark_context.addPyFile("/home/meatwad/prog/src/distbot/bot/python/util/web.py")
 
-    if sub_command == "search":
-        return do_search(args, message_limit)
-    else:
-        return "no such command %s" % sub_command
-if __name__ == "__main__":
+    try:
+        yield spark_context
+    finally:
+        spark_context.stop()
 
+    
 
-    text = execute_command("spark search !nick=oatzhakok !msg=asdf !chan=boatz".split())
-    print(text)
+MODULE_CLASS_NAME="Spark"
 
-    quit()
+MODULE_SUBCOMMAND="spark"
 
-    filtered_messages = blobs.filter(search("nick", "oatzhakok")).filter(search("message", "boatz"))
+class Spark():
+    def __init__(self, configuration, zk_client, **kwargs):
 
-    for msg in filtered_messages.take(10):
-        print(msg)
-    print(filtered_messages.count())
+        self.configuration = configuration
+        self.zk_client = zk_client
 
-    #result = make_paste(hello_messages)
-    #print(result)
+    def consume(self, message):
+        return
+        args = message["message"].args
+        query = message["message"].command
 
+        # setup convinience mappings
+        for real_name, nice_names in CONVINIENCE_MAPPING.items():
+            for nice_name in nice_names:
+                if nice_name in args:
+                    if real_name not in args:
+                        args[real_name] = args[nice_name]
+                    del args[nice_name]
+
+        # ensure channel # prefix
+        if "destination" in args and args["destination"][0] != "#":
+            args["destination"] = "#" + args["destination"]
+
+        sub_command = query[1]
+        if sub_command == "search":
+            with spark_context("spark://192.168.1.201:7077", "bot") as sc:
+                response = do_search(sc, args, 3)
+        else:
+            response = "no such command %s" % sub_command
+
+        who = message["nick"]
+        where = message["destination"]
+
+        return util.message.Message(who, where, response)
 

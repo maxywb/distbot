@@ -85,7 +85,7 @@ class Commander():
                 self.log.debug("load %s", mod)
                 self._load_module(mod)
 
-            assert self.loaded_modules == cannon_modules
+            assert self.loaded_modules == cannon_modules, "sets differ %s != %s" % (self.loaded_modules, cannon_modules)
 
     def _unload_module(self, base_module_name):
         module_name = "modules." + base_module_name
